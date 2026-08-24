@@ -9,10 +9,13 @@ import os
 import uuid
 import xml.sax.saxutils as sx
 
-BUNDLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GridfinityBatteryBinGenerator.bundle')
+# The payload is the BARE add-in folder (py/manifest at its root) - Fusion loads
+# this layout from C:\Program Files\Autodesk\ApplicationPlugins; the .bundle
+# format is only used for the Autodesk App Store submission zip.
+BUNDLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GridfinityBatteryBinGenerator')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GridfinityBatteryBinGenerator.wxs')
 
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 MANUFACTURER = 'Gravlaxy'
 PRODUCT_NAME = 'GridfinityBatteryBinGenerator for Autodesk Fusion'
 UPGRADE_CODE = '{6f2a8f10-9c53-4b7e-8d21-b7a4f0c2d9a1}'  # never change this
@@ -43,8 +46,8 @@ def emitDir(fsPath, relPath, indent):
         rel = (relPath + '/' + f) if relPath else f
         compId = makeId('cmp', rel)
         fileId = makeId('fil', rel)
-        guid = str(uuid.uuid5(NAMESPACE, 'pf64/Autodesk/ApplicationPlugins/GridfinityBatteryBinGenerator.bundle/' + rel)).upper()
-        src = os.path.join('GridfinityBatteryBinGenerator.bundle', rel.replace('/', os.sep))
+        guid = str(uuid.uuid5(NAMESPACE, 'pf64/Autodesk/ApplicationPlugins/GridfinityBatteryBinGenerator/' + rel)).upper()
+        src = os.path.join('GridfinityBatteryBinGenerator', rel.replace('/', os.sep))
         lines.append('{}<Component Id="{}" Guid="{{{}}}">'.format(pad, compId, guid))
         lines.append('{}    <File Id="{}" Name="{}" Source="{}" KeyPath="yes"/>'.format(
             pad, fileId, sx.escape(f, {'"': '&quot;'}), sx.escape(src, {'"': '&quot;'})))
@@ -81,7 +84,7 @@ wxs = '''<?xml version="1.0" encoding="utf-8"?>
             <Directory Id="ProgramFiles64Folder">
                 <Directory Id="dirAutodesk" Name="Autodesk">
                     <Directory Id="dirAppPlugins" Name="ApplicationPlugins">
-                        <Directory Id="dirBundle" Name="GridfinityBatteryBinGenerator.bundle">
+                        <Directory Id="dirBundle" Name="GridfinityBatteryBinGenerator">
 {body}
                         </Directory>
                     </Directory>

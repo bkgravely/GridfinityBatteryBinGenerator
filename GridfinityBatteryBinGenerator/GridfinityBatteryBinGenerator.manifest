@@ -4,9 +4,9 @@
 	"id":	"7c9f1a2e-4b83-4c5d-9e6f-1d2a3b4c5d6e",
 	"author":	"Bryan",
 	"description":	{
-		"":	"Generates gridfinity bins with a maximized grid of tip-down battery storage slots (AAA, AA, CR123, 9V). Built on the GridfinityGenerator add-in library by Lev Mishin (CC BY-NC-SA 4.0)."
+		"":	"Generates gridfinity bins with a maximized grid of tip-down battery storage slots (AAA, AA, CR123, 9V, 18650). Built on the GridfinityGenerator add-in library by Lev Mishin (CC BY-NC-SA 4.0)."
 	},
-	"version":	"1.0.1",
+	"version":	"1.0.2",
 	"runOnStartup":	true,
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true

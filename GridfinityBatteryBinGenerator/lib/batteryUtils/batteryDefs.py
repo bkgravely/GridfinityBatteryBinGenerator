@@ -18,7 +18,7 @@
 #   - "batteryLength" is the full overall battery length (button included),
 #     used only for the stackability fit-check readout.
 
-BATTERY_TYPES = ['AAA', 'AA', 'CR123', '9V']
+BATTERY_TYPES = ['AAA', 'AA', 'CR123', '9V', '18650']
 
 BATTERY_DEFAULTS = {
     'AAA': dict(
@@ -53,6 +53,18 @@ BATTERY_DEFAULTS = {
         tipDepth=2.5,
         ledgeDrop=15.0,
         batteryLength=34.5,
+    ),
+    '18650': dict(
+        isRound=True,
+        slotDiaLen=19.0,   # 18.6 mm max cell dia + 0.4 clearance (unprotected cells)
+        slotWidth=0.0,
+        slotDepth=51.0,
+        tipDiaLen=10.0,    # clears button-top positive terminals
+        tipWidth=0.0,
+        tipDepth=2.5,
+        ledgeDrop=15.0,
+        batteryLength=65.2,  # unprotected max; protected/button-top cells run 67-70,
+                             # bump this (and slot depth) in the dialog for those
     ),
     '9V': dict(
         isRound=False,

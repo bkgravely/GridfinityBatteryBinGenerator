@@ -3,11 +3,11 @@
     <Product Id="*"
              Name="GridfinityBatteryBinGenerator for Autodesk Fusion"
              Language="1033"
-             Version="1.0.1"
+             Version="1.0.2"
              Manufacturer="Gravlaxy"
              UpgradeCode="{6f2a8f10-9c53-4b7e-8d21-b7a4f0c2d9a1}">
         <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
-                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.0.1"
+                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.0.2"
                  Manufacturer="Gravlaxy"/>
         <MediaTemplate EmbedCab="yes"/>
         <MajorUpgrade AllowSameVersionUpgrades="yes"
@@ -18,160 +18,153 @@
             <Directory Id="ProgramFiles64Folder">
                 <Directory Id="dirAutodesk" Name="Autodesk">
                     <Directory Id="dirAppPlugins" Name="ApplicationPlugins">
-                        <Directory Id="dirBundle" Name="GridfinityBatteryBinGenerator.bundle">
-                            <Component Id="cmp_PackageContents_xml" Guid="{DA7C3CE0-F328-5045-9BA3-FEE5D5DC7B6F}">
-                                <File Id="fil_PackageContents_xml" Name="PackageContents.xml" Source="GridfinityBatteryBinGenerator.bundle/PackageContents.xml" KeyPath="yes"/>
+                        <Directory Id="dirBundle" Name="GridfinityBatteryBinGenerator">
+                            <Component Id="cmp_ATTRIBUTION_md" Guid="{F213ED47-3FF6-5089-B56C-FFEB00829D16}">
+                                <File Id="fil_ATTRIBUTION_md" Name="ATTRIBUTION.md" Source="GridfinityBatteryBinGenerator/ATTRIBUTION.md" KeyPath="yes"/>
                             </Component>
-                            <Directory Id="dir_Contents" Name="Contents">
-                                <Directory Id="dir_Contents_GridfinityBatteryBinGenerator" Name="GridfinityBatteryBinGenerator">
-                                    <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_ATTRIBUTION_md" Guid="{2536E0B8-0800-502C-9E61-D69F53C0EB63}">
-                                        <File Id="fil_Contents_GridfinityBatteryBinGenerator_ATTRIBUTION_md" Name="ATTRIBUTION.md" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/ATTRIBUTION.md" KeyPath="yes"/>
+                            <Component Id="cmp_GridfinityBatteryBinGenerator_manifest" Guid="{5C7E70FF-C55C-5A68-987B-E9D36A3E8530}">
+                                <File Id="fil_GridfinityBatteryBinGenerator_manifest" Name="GridfinityBatteryBinGenerator.manifest" Source="GridfinityBatteryBinGenerator/GridfinityBatteryBinGenerator.manifest" KeyPath="yes"/>
+                            </Component>
+                            <Component Id="cmp_GridfinityBatteryBinGenerator_py" Guid="{4ECD5052-119E-5C02-B47C-44322231E805}">
+                                <File Id="fil_GridfinityBatteryBinGenerator_py" Name="GridfinityBatteryBinGenerator.py" Source="GridfinityBatteryBinGenerator/GridfinityBatteryBinGenerator.py" KeyPath="yes"/>
+                            </Component>
+                            <Component Id="cmp_README_md" Guid="{B597B33B-15FE-51EA-8931-66A8D783D3EA}">
+                                <File Id="fil_README_md" Name="README.md" Source="GridfinityBatteryBinGenerator/README.md" KeyPath="yes"/>
+                            </Component>
+                            <Component Id="cmp_config_py" Guid="{39512176-C060-5195-B0AA-25D52634940D}">
+                                <File Id="fil_config_py" Name="config.py" Source="GridfinityBatteryBinGenerator/config.py" KeyPath="yes"/>
+                            </Component>
+                            <Directory Id="dir_commands" Name="commands">
+                                <Component Id="cmp_commands___init___py" Guid="{A9FA3E65-F884-52B0-B82E-483E5E3CA1E3}">
+                                    <File Id="fil_commands___init___py" Name="__init__.py" Source="GridfinityBatteryBinGenerator/commands/__init__.py" KeyPath="yes"/>
+                                </Component>
+                                <Directory Id="dir_commands_commandCreateBatteryBin" Name="commandCreateBatteryBin">
+                                    <Component Id="cmp_commands_commandCreateBatteryBin___init___py" Guid="{92C1F8F0-D41A-53C7-B91C-F81755274032}">
+                                        <File Id="fil_commands_commandCreateBatteryBin___init___py" Name="__init__.py" Source="GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/__init__.py" KeyPath="yes"/>
                                     </Component>
-                                    <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_GridfinityBattery" Guid="{78480AA0-9469-5EAD-80DC-6723218C812C}">
-                                        <File Id="fil_Contents_GridfinityBatteryBinGenerator_GridfinityBattery" Name="GridfinityBatteryBinGenerator.manifest" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/GridfinityBatteryBinGenerator.manifest" KeyPath="yes"/>
+                                    <Component Id="cmp_commands_commandCreateBatteryBin_entry_py" Guid="{604AB275-8225-5EF1-AFD0-0E3657C22F33}">
+                                        <File Id="fil_commands_commandCreateBatteryBin_entry_py" Name="entry.py" Source="GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/entry.py" KeyPath="yes"/>
                                     </Component>
-                                    <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_GridfinityBat_1" Guid="{A57B1CCE-FFA8-5001-8940-3C0D0D266890}">
-                                        <File Id="fil_Contents_GridfinityBatteryBinGenerator_GridfinityBat_1" Name="GridfinityBatteryBinGenerator.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/GridfinityBatteryBinGenerator.py" KeyPath="yes"/>
-                                    </Component>
-                                    <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_README_md" Guid="{A9A29E7C-8075-5FE3-9A37-20EEB420A7F2}">
-                                        <File Id="fil_Contents_GridfinityBatteryBinGenerator_README_md" Name="README.md" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/README.md" KeyPath="yes"/>
-                                    </Component>
-                                    <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_config_py" Guid="{8C1602EA-B2D2-55D8-8557-9A08EDD4EA78}">
-                                        <File Id="fil_Contents_GridfinityBatteryBinGenerator_config_py" Name="config.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/config.py" KeyPath="yes"/>
-                                    </Component>
-                                    <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_commands" Name="commands">
-                                        <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_commands___init__" Guid="{43A25511-68C8-5B00-BF5B-9131EF11D22E}">
-                                            <File Id="fil_Contents_GridfinityBatteryBinGenerator_commands___init__" Name="__init__.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/commands/__init__.py" KeyPath="yes"/>
+                                    <Directory Id="dir_commands_commandCreateBatteryBin_resources" Name="resources">
+                                        <Component Id="cmp_commands_commandCreateBatteryBin_resources_16x16_png" Guid="{C2D4EC88-121F-5DC9-B914-C62F1D5901AA}">
+                                            <File Id="fil_commands_commandCreateBatteryBin_resources_16x16_png" Name="16x16.png" Source="GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/16x16.png" KeyPath="yes"/>
                                         </Component>
-                                        <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_commands_commandC" Name="commandCreateBatteryBin">
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_commandC" Guid="{4135270F-E0DF-5764-8549-FCE8B5FB8162}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_commands_commandC" Name="__init__.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/__init__.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_1" Guid="{D1E9B23A-3BAB-5E90-BFAF-CC4DE5404823}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_commands_comm_1" Name="entry.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/entry.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_commands_comm_1" Name="resources">
-                                                <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_2" Guid="{AF6475C5-1E0C-5FCA-846D-84C981723221}">
-                                                    <File Id="fil_Contents_GridfinityBatteryBinGenerator_commands_comm_2" Name="16x16.png" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/16x16.png" KeyPath="yes"/>
-                                                </Component>
-                                                <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_3" Guid="{6C8F1D10-2E1B-52EF-BABE-13BAB68A5EB6}">
-                                                    <File Id="fil_Contents_GridfinityBatteryBinGenerator_commands_comm_3" Name="32x32.png" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/32x32.png" KeyPath="yes"/>
-                                                </Component>
-                                                <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_4" Guid="{5866CE0C-AB70-5B86-A51C-AE7867DC0196}">
-                                                    <File Id="fil_Contents_GridfinityBatteryBinGenerator_commands_comm_4" Name="64x64.png" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/64x64.png" KeyPath="yes"/>
-                                                </Component>
-                                            </Directory>
-                                        </Directory>
-                                    </Directory>
-                                    <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_lib" Name="lib">
-                                        <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_configUtils_p" Guid="{983AA772-B71C-5FB1-A3A7-3AB87284E45E}">
-                                            <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_configUtils_p" Name="configUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/configUtils.py" KeyPath="yes"/>
+                                        <Component Id="cmp_commands_commandCreateBatteryBin_resources_32x32_png" Guid="{7F241522-FDDE-5B61-BA64-986CF70EF18A}">
+                                            <File Id="fil_commands_commandCreateBatteryBin_resources_32x32_png" Name="32x32.png" Source="GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/32x32.png" KeyPath="yes"/>
                                         </Component>
-                                        <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_lib_batteryUtils" Name="batteryUtils">
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_batteryUtils_" Guid="{9D3353BF-FB83-5792-BEE7-CBC31833C75E}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_batteryUtils_" Name="__init__.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/batteryUtils/__init__.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_batteryUt_1" Guid="{EA65529B-93C3-5D30-92BA-761AC2C3DF96}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_batteryUt_1" Name="batteryDefs.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/batteryUtils/batteryDefs.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_batteryUt_2" Guid="{A8212900-81AE-576B-84DE-A2E177961415}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_batteryUt_2" Name="layout.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/batteryUtils/layout.py" KeyPath="yes"/>
-                                            </Component>
-                                        </Directory>
-                                        <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_lib_fusion360util" Name="fusion360utils">
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_fusion360util" Guid="{3C963535-D375-5E40-8EBB-AA0EFE857EAC}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_fusion360util" Name="__init__.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/fusion360utils/__init__.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_fusion360_1" Guid="{266A3453-0447-50A0-8C58-E10198AF5D10}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_fusion360_1" Name="event_utils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/fusion360utils/event_utils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_fusion360_2" Guid="{209631C0-E14C-5E1B-A0B7-2A90DB07E2C4}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_fusion360_2" Name="general_utils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/fusion360utils/general_utils.py" KeyPath="yes"/>
-                                            </Component>
-                                        </Directory>
-                                        <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_lib_gridfinityUti" Name="gridfinityUtils">
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinityUti" Guid="{7FCFB0F5-AFE6-5EC0-9FE7-8BACB23C72A5}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinityUti" Name="baseGenerator.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseGenerator.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_1" Guid="{D5ED1350-6B1A-5177-9930-A464E3E8F88E}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_1" Name="baseGeneratorInput.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseGeneratorInput.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_2" Guid="{B2C6C9F2-603D-5632-A9C6-7816F1A9C206}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_2" Name="baseplateGenerator.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseplateGenerator.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_3" Guid="{D7BE1C19-2583-56D4-95C8-E7603F053ACD}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_3" Name="baseplateGeneratorInput.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseplateGeneratorInput.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_4" Guid="{E267B06E-3259-5CCA-9550-B9324CA1D1BB}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_4" Name="binBodyCutoutGenerator.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyCutoutGenerator.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_5" Guid="{3B993E8E-36BD-568F-A278-277B4E0E48FB}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_5" Name="binBodyCutoutGeneratorInput.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyCutoutGeneratorInput.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_6" Guid="{2406F07D-4892-5920-B6B2-B747A5AC219D}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_6" Name="binBodyGenerator.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyGenerator.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_7" Guid="{FD23C008-28D4-51B6-85AC-D3134C511BBB}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_7" Name="binBodyGeneratorInput.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyGeneratorInput.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_8" Guid="{C95FEE3D-B7AF-59F4-9ABD-F104DCFAE028}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_8" Name="binBodyLipGenerator.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyLipGenerator.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_9" Guid="{FFE070D2-30A6-5EA0-BB91-86DFAB24D6C6}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_9" Name="binBodyLipGeneratorInput.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyLipGeneratorInput.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_10" Guid="{BDCE037D-06F3-5996-8C50-46E1F7514AA3}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_10" Name="binBodyTabGenerator.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyTabGenerator.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_11" Guid="{0BFB9E2B-A391-57EB-8715-6087A81CF164}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_11" Name="binBodyTabGeneratorInput.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyTabGeneratorInput.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_12" Guid="{3D177B06-28A4-542C-9304-E8520915F485}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_12" Name="combineUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/combineUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_13" Guid="{81B08584-C283-5BC5-8F00-333BD6416F47}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_13" Name="commonUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/commonUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_14" Guid="{0CC2722A-3B2A-5E29-987B-3F02FFC0A7EF}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_14" Name="const.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/const.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_15" Guid="{387C909B-1D9A-5FBA-B497-689AB1796C8C}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_15" Name="edgeUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/edgeUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_16" Guid="{C6BF7BC2-3107-563B-838F-7552407E112E}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_16" Name="extrudeUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/extrudeUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_17" Guid="{2D05D2E8-A6F3-5789-8338-CB6AE907CA51}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_17" Name="faceUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/faceUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_18" Guid="{098F63C1-EDAA-5B95-9766-1B22FF3D9B73}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_18" Name="filletUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/filletUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_19" Guid="{68AF5850-3F6B-5292-8AB5-5BCC7AF050C7}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_19" Name="geometryUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/geometryUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_20" Guid="{ED851BFA-6C0E-56C1-B3ED-326B8C353735}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_20" Name="patternUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/patternUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_21" Guid="{31874369-A571-564B-919D-7896A0789B13}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_21" Name="shapeUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/shapeUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_22" Guid="{FFD86EAD-CA08-5EE9-A5EE-8468F7DE652D}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_22" Name="shellUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/shellUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_23" Guid="{D9D620DB-94DF-52FC-8DBA-A349388ACFB3}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_23" Name="sketchUtils.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/gridfinityUtils/sketchUtils.py" KeyPath="yes"/>
-                                            </Component>
-                                        </Directory>
-                                        <Directory Id="dir_Contents_GridfinityBatteryBinGenerator_lib_ui" Name="ui">
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_ui_commandUiS" Guid="{3E483BFE-C4D0-5B9D-997D-C4412759B353}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_ui_commandUiS" Name="commandUiState.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/ui/commandUiState.py" KeyPath="yes"/>
-                                            </Component>
-                                            <Component Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_ui_unsupporte" Guid="{1D127563-6388-525A-9B33-72E7ABAA6B7E}">
-                                                <File Id="fil_Contents_GridfinityBatteryBinGenerator_lib_ui_unsupporte" Name="unsupportedDesignTypeException.py" Source="GridfinityBatteryBinGenerator.bundle/Contents/GridfinityBatteryBinGenerator/lib/ui/unsupportedDesignTypeException.py" KeyPath="yes"/>
-                                            </Component>
-                                        </Directory>
+                                        <Component Id="cmp_commands_commandCreateBatteryBin_resources_64x64_png" Guid="{BD5AB7E3-D5B8-525F-8145-117EA2A17BAB}">
+                                            <File Id="fil_commands_commandCreateBatteryBin_resources_64x64_png" Name="64x64.png" Source="GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/64x64.png" KeyPath="yes"/>
+                                        </Component>
                                     </Directory>
+                                </Directory>
+                            </Directory>
+                            <Directory Id="dir_lib" Name="lib">
+                                <Component Id="cmp_lib_configUtils_py" Guid="{87EFFC90-7851-5169-916D-66AC3ED50D53}">
+                                    <File Id="fil_lib_configUtils_py" Name="configUtils.py" Source="GridfinityBatteryBinGenerator/lib/configUtils.py" KeyPath="yes"/>
+                                </Component>
+                                <Directory Id="dir_lib_batteryUtils" Name="batteryUtils">
+                                    <Component Id="cmp_lib_batteryUtils___init___py" Guid="{32EE4090-CE37-58BE-AD9D-972CABD6FE7C}">
+                                        <File Id="fil_lib_batteryUtils___init___py" Name="__init__.py" Source="GridfinityBatteryBinGenerator/lib/batteryUtils/__init__.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_batteryUtils_batteryDefs_py" Guid="{146130E0-1CF0-5C7D-BB4E-33EA669E86F2}">
+                                        <File Id="fil_lib_batteryUtils_batteryDefs_py" Name="batteryDefs.py" Source="GridfinityBatteryBinGenerator/lib/batteryUtils/batteryDefs.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_batteryUtils_layout_py" Guid="{FABDA891-9D02-5F4C-B112-CE9D1DCC185D}">
+                                        <File Id="fil_lib_batteryUtils_layout_py" Name="layout.py" Source="GridfinityBatteryBinGenerator/lib/batteryUtils/layout.py" KeyPath="yes"/>
+                                    </Component>
+                                </Directory>
+                                <Directory Id="dir_lib_fusion360utils" Name="fusion360utils">
+                                    <Component Id="cmp_lib_fusion360utils___init___py" Guid="{E8054010-2A88-59EE-8AC7-E199482D8CB8}">
+                                        <File Id="fil_lib_fusion360utils___init___py" Name="__init__.py" Source="GridfinityBatteryBinGenerator/lib/fusion360utils/__init__.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_fusion360utils_event_utils_py" Guid="{BBCF8678-D862-57C2-8650-60134435F3DA}">
+                                        <File Id="fil_lib_fusion360utils_event_utils_py" Name="event_utils.py" Source="GridfinityBatteryBinGenerator/lib/fusion360utils/event_utils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_fusion360utils_general_utils_py" Guid="{D94C9A9B-0621-5AF2-8519-6E9539BFA7A6}">
+                                        <File Id="fil_lib_fusion360utils_general_utils_py" Name="general_utils.py" Source="GridfinityBatteryBinGenerator/lib/fusion360utils/general_utils.py" KeyPath="yes"/>
+                                    </Component>
+                                </Directory>
+                                <Directory Id="dir_lib_gridfinityUtils" Name="gridfinityUtils">
+                                    <Component Id="cmp_lib_gridfinityUtils_baseGenerator_py" Guid="{BA9D956D-730A-5F55-AE4E-BA5FC97D30FF}">
+                                        <File Id="fil_lib_gridfinityUtils_baseGenerator_py" Name="baseGenerator.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseGenerator.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_baseGeneratorInput_py" Guid="{125CDD1C-48AE-59D7-BFFA-D25255246110}">
+                                        <File Id="fil_lib_gridfinityUtils_baseGeneratorInput_py" Name="baseGeneratorInput.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseGeneratorInput.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_baseplateGenerator_py" Guid="{DC062440-BD5D-52F3-8DA4-73CD39A625E6}">
+                                        <File Id="fil_lib_gridfinityUtils_baseplateGenerator_py" Name="baseplateGenerator.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseplateGenerator.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_baseplateGeneratorInput_py" Guid="{FE43271E-B11D-591F-AC10-87E9F2B0EDF2}">
+                                        <File Id="fil_lib_gridfinityUtils_baseplateGeneratorInput_py" Name="baseplateGeneratorInput.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/baseplateGeneratorInput.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyCutoutGenerator_py" Guid="{3D5A0E6A-C904-5652-9204-E81FADBC6AB6}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyCutoutGenerator_py" Name="binBodyCutoutGenerator.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyCutoutGenerator.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyCutoutGeneratorInput_py" Guid="{851B5ECA-7A54-5D61-BBF4-47CE9D0805CB}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyCutoutGeneratorInput_py" Name="binBodyCutoutGeneratorInput.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyCutoutGeneratorInput.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyGenerator_py" Guid="{8DE558A8-624E-5E22-B7B9-193812A8F888}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyGenerator_py" Name="binBodyGenerator.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyGenerator.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyGeneratorInput_py" Guid="{FC5EC266-017E-5CFC-8A00-6B3B7B736649}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyGeneratorInput_py" Name="binBodyGeneratorInput.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyGeneratorInput.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyLipGenerator_py" Guid="{0F1E76AC-6FCD-54B1-B700-C0787D7EBFE5}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyLipGenerator_py" Name="binBodyLipGenerator.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyLipGenerator.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyLipGeneratorInput_py" Guid="{B596247D-7CBF-5E1D-8A2F-5D2F01B7B9DE}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyLipGeneratorInput_py" Name="binBodyLipGeneratorInput.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyLipGeneratorInput.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyTabGenerator_py" Guid="{ABB97B6A-782D-5BCC-8E09-81590BAD25B3}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyTabGenerator_py" Name="binBodyTabGenerator.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyTabGenerator.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_binBodyTabGeneratorInput_py" Guid="{EC2FE191-8545-50D7-83C0-C6AAC1FCEC39}">
+                                        <File Id="fil_lib_gridfinityUtils_binBodyTabGeneratorInput_py" Name="binBodyTabGeneratorInput.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/binBodyTabGeneratorInput.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_combineUtils_py" Guid="{6D607D11-0EEB-5174-97CE-6BCD08F57B56}">
+                                        <File Id="fil_lib_gridfinityUtils_combineUtils_py" Name="combineUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/combineUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_commonUtils_py" Guid="{8A8B1DFF-E59E-5A51-916A-73972B8DED0E}">
+                                        <File Id="fil_lib_gridfinityUtils_commonUtils_py" Name="commonUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/commonUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_const_py" Guid="{FDD452E3-7829-5901-B746-6BB8327795A2}">
+                                        <File Id="fil_lib_gridfinityUtils_const_py" Name="const.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/const.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_edgeUtils_py" Guid="{B5A06285-28FC-509B-B07C-9CB50B68BB7F}">
+                                        <File Id="fil_lib_gridfinityUtils_edgeUtils_py" Name="edgeUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/edgeUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_extrudeUtils_py" Guid="{61F79356-D324-59E6-97EC-F36FE7DA79E3}">
+                                        <File Id="fil_lib_gridfinityUtils_extrudeUtils_py" Name="extrudeUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/extrudeUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_faceUtils_py" Guid="{D0FAFE83-3600-55E9-B218-06090768F1FE}">
+                                        <File Id="fil_lib_gridfinityUtils_faceUtils_py" Name="faceUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/faceUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_filletUtils_py" Guid="{79D9D249-7B92-59BC-8656-44CFA63E7099}">
+                                        <File Id="fil_lib_gridfinityUtils_filletUtils_py" Name="filletUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/filletUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_geometryUtils_py" Guid="{68BAC2D6-E1FA-5ADC-B8C7-308F59657D08}">
+                                        <File Id="fil_lib_gridfinityUtils_geometryUtils_py" Name="geometryUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/geometryUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_patternUtils_py" Guid="{31BE9C06-AEE2-5DC7-8B7C-6484289EAFA5}">
+                                        <File Id="fil_lib_gridfinityUtils_patternUtils_py" Name="patternUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/patternUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_shapeUtils_py" Guid="{884D12BB-A6C8-5B1E-B46C-971059DEC7AC}">
+                                        <File Id="fil_lib_gridfinityUtils_shapeUtils_py" Name="shapeUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/shapeUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_shellUtils_py" Guid="{CFF84FDA-EA32-58EF-96E1-FCB1FB1CD339}">
+                                        <File Id="fil_lib_gridfinityUtils_shellUtils_py" Name="shellUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/shellUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_gridfinityUtils_sketchUtils_py" Guid="{14956841-A6BE-5AF4-8269-2DD7845EFB18}">
+                                        <File Id="fil_lib_gridfinityUtils_sketchUtils_py" Name="sketchUtils.py" Source="GridfinityBatteryBinGenerator/lib/gridfinityUtils/sketchUtils.py" KeyPath="yes"/>
+                                    </Component>
+                                </Directory>
+                                <Directory Id="dir_lib_ui" Name="ui">
+                                    <Component Id="cmp_lib_ui_commandUiState_py" Guid="{4E563B62-22E3-5B78-A48E-EDD6042953B1}">
+                                        <File Id="fil_lib_ui_commandUiState_py" Name="commandUiState.py" Source="GridfinityBatteryBinGenerator/lib/ui/commandUiState.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_ui_unsupportedDesignTypeException_py" Guid="{C4DF89CC-4807-56C7-B902-94C363E8A868}">
+                                        <File Id="fil_lib_ui_unsupportedDesignTypeException_py" Name="unsupportedDesignTypeException.py" Source="GridfinityBatteryBinGenerator/lib/ui/unsupportedDesignTypeException.py" KeyPath="yes"/>
+                                    </Component>
                                 </Directory>
                             </Directory>
                         </Directory>
@@ -180,51 +173,50 @@
             </Directory>
         </Directory>
         <Feature Id="MainFeature" Title="GridfinityBatteryBinGenerator for Autodesk Fusion" Level="1">
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_ATTRIBUTION_md"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_GridfinityBat_1"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_GridfinityBattery"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_README_md"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_commands___init__"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_1"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_2"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_3"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_comm_4"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_commands_commandC"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_config_py"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_batteryUt_1"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_batteryUt_2"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_batteryUtils_"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_configUtils_p"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_fusion360_1"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_fusion360_2"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_fusion360util"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_1"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_10"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_11"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_12"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_13"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_14"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_15"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_16"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_17"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_18"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_19"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_2"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_20"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_21"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_22"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_23"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_3"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_4"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_5"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_6"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_7"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_8"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinit_9"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_gridfinityUti"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_ui_commandUiS"/>
-            <ComponentRef Id="cmp_Contents_GridfinityBatteryBinGenerator_lib_ui_unsupporte"/>
-            <ComponentRef Id="cmp_PackageContents_xml"/>
+            <ComponentRef Id="cmp_ATTRIBUTION_md"/>
+            <ComponentRef Id="cmp_GridfinityBatteryBinGenerator_manifest"/>
+            <ComponentRef Id="cmp_GridfinityBatteryBinGenerator_py"/>
+            <ComponentRef Id="cmp_README_md"/>
+            <ComponentRef Id="cmp_commands___init___py"/>
+            <ComponentRef Id="cmp_commands_commandCreateBatteryBin___init___py"/>
+            <ComponentRef Id="cmp_commands_commandCreateBatteryBin_entry_py"/>
+            <ComponentRef Id="cmp_commands_commandCreateBatteryBin_resources_16x16_png"/>
+            <ComponentRef Id="cmp_commands_commandCreateBatteryBin_resources_32x32_png"/>
+            <ComponentRef Id="cmp_commands_commandCreateBatteryBin_resources_64x64_png"/>
+            <ComponentRef Id="cmp_config_py"/>
+            <ComponentRef Id="cmp_lib_batteryUtils___init___py"/>
+            <ComponentRef Id="cmp_lib_batteryUtils_batteryDefs_py"/>
+            <ComponentRef Id="cmp_lib_batteryUtils_layout_py"/>
+            <ComponentRef Id="cmp_lib_configUtils_py"/>
+            <ComponentRef Id="cmp_lib_fusion360utils___init___py"/>
+            <ComponentRef Id="cmp_lib_fusion360utils_event_utils_py"/>
+            <ComponentRef Id="cmp_lib_fusion360utils_general_utils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_baseGeneratorInput_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_baseGenerator_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_baseplateGeneratorInput_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_baseplateGenerator_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyCutoutGeneratorInput_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyCutoutGenerator_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyGeneratorInput_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyGenerator_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyLipGeneratorInput_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyLipGenerator_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyTabGeneratorInput_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_binBodyTabGenerator_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_combineUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_commonUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_const_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_edgeUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_extrudeUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_faceUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_filletUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_geometryUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_patternUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_shapeUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_shellUtils_py"/>
+            <ComponentRef Id="cmp_lib_gridfinityUtils_sketchUtils_py"/>
+            <ComponentRef Id="cmp_lib_ui_commandUiState_py"/>
+            <ComponentRef Id="cmp_lib_ui_unsupportedDesignTypeException_py"/>
         </Feature>
     </Product>
 </Wix>

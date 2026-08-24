@@ -25,7 +25,7 @@ ui = app.userInterface
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_cmdBatteryBin'
 CMD_NAME = 'Battery bin'
 CMD_Description = ('Create a gridfinity bin with a maximized grid of tip-down '
-                   'battery slots (AAA, AA, CR123, 9V)')
+                   'battery slots (AAA, AA, CR123, 9V, 18650)')
 
 IS_PROMOTED = True
 

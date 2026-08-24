@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2 — 2026-08-24
+
+- Added 18650 battery type (19 mm slots, 51 mm deep, 10 mm tip recess for
+  button tops, auto height 11 u). Defaults assume unprotected 65.2 mm cells;
+  for protected/button-top cells raise battery length and slot depth in the
+  dialog. A 2x3 bin holds 15; larger bins switch to hex packing automatically.
+
 ## 1.0.1 — 2026-08-24
 
 - Fixed battery type switching not applying that battery's dimensions

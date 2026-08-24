@@ -98,8 +98,8 @@ def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8):
     return FakeInputs(items)
 
 
-expectedAuto = {'AAA': 8, 'AA': 9, 'CR123': 6, '9V': 9}
-expectedCount2x3 = {'AAA': 41, 'AA': 25, 'CR123': 20, '9V': 10}
+expectedAuto = {'AAA': 8, 'AA': 9, 'CR123': 6, '9V': 9, '18650': 11}
+expectedCount2x3 = {'AAA': 41, 'AA': 25, 'CR123': 20, '9V': 10, '18650': 15}
 
 for bat in defsMod.BATTERY_TYPES:
     inputs = makeInputs(battery=bat)

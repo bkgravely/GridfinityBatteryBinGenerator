@@ -65,7 +65,7 @@ def verifyLayout(name, res, floorW, floorL, diaOrX, spacing, wallClear, diaOrY=N
 
 
 print('--- round layouts, all battery types, bin sizes 1x1..5x5 ---')
-for bat in ['AAA', 'AA', 'CR123']:
+for bat in ['AAA', 'AA', 'CR123', '18650']:
     d = batteryDefs.BATTERY_DEFAULTS[bat]
     for bx in range(1, 6):
         for by in range(1, 6):
@@ -104,7 +104,7 @@ res = layout.computeRoundLayout(24.75, 24.75, 14.75, 3.0, 5.0)
 check('exactly one fits', res is not None and res['count'] == 1, res)
 
 print('--- auto height + fit checks with default tables ---')
-expectedU = {'AAA': 8, 'AA': 9, 'CR123': 6, '9V': 9}
+expectedU = {'AAA': 8, 'AA': 9, 'CR123': 6, '9V': 9, '18650': 11}
 for bat in batteryDefs.BATTERY_TYPES:
     d = batteryDefs.BATTERY_DEFAULTS[bat]
     u = layout.autoMinHeightUnits(d['ledgeDrop'], d['slotDepth'], d['tipDepth'],
