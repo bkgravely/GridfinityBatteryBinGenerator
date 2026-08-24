@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Build outputs (attach these to GitHub Releases instead of committing)
+*.msi
+*.wixobj
+*.wixpdb
+*.zip
+GridfinityBatteryBinGenerator.bundle/
+
+# Fusion runtime config written next to the command at runtime
+commandConfig/
+
+# OS noise
+Thumbs.db
+.DS_Store
