@@ -33,6 +33,9 @@ orientations and keeps whichever fits the most cells, centered in the bin.
 - **Editable layout rules** — minimum slot-to-slot spacing (3 mm), slot-to-wall
   clearance (5 mm), and the fillet radius where the slot ledge meets the wall
   (3 mm) are all dialog inputs; tightening them squeezes in more batteries.
+- **Branded** — the Redwood Craftworks logo is engraved into the corner
+  gridfinity foot of every bin. Not an option and not a prompt; it is simply
+  always there, recessed so the bin still sits flat.
 - **Standard bin options** — stacking lip, lip notches, magnet cutouts, and
   screw holes pass straight through to the underlying library.
 
@@ -53,8 +56,9 @@ button appears under **Solid → Create**.
 **MSI (Windows, all users):** grab the installer from
 [Releases](../../releases). It installs the add-in machine-wide to
 `C:\Program Files\Autodesk\ApplicationPlugins`, covering every user profile on
-the computer. Don't combine it with a manual copy in `%APPDATA%` or the
-command will appear twice.
+the computer, and finishes with a page confirming the install and reminding
+you to restart Fusion. Don't combine it with a manual copy in `%APPDATA%` or
+the command will appear twice.
 
 ## Usage
 
@@ -64,6 +68,30 @@ the bin footprint in Gridfinity units. The result box at the bottom shows the
 battery count, the chosen layout, the vertical stack-up, and the stackability
 margin before you commit. *Show preview* regenerates the model live as you
 change inputs (slower on large bins); leave it off and just hit OK.
+
+### Logo
+
+Every bin is engraved with the logo at
+`GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/logo.svg`,
+28 mm across and 0.4 mm deep (two 0.2 mm layers) on the corner foot. There is
+no dialog control for it — the size, depth, foot and orientation are constants
+at the top of `lib/batteryUtils/logoUtils.py`, and the artwork is changed by
+replacing that SVG.
+
+Two things matter if you swap the artwork. It must be **closed paths with any
+lettering converted to outlines**, because Fusion's SVG import ignores
+`<text>` entirely. And it must be **pre-oriented** — mirrored, and rotated the
+way you want it to sit on the foot — because Fusion imports SVG geometry as
+fixed curves that cannot be moved afterwards. (`LOGO_MIRROR` and
+`LOGO_ROTATION` in `logoUtils.py` will apply a transform for you, but baking
+the orientation into the path data is more reliable.) A foot offers a 35.1 mm
+flat square, so anything up to about 31 mm fits with a margin to spare.
+
+The bundled artwork is already mirrored and rotated; the untouched original is
+kept at `docs/logo-source.svg`.
+
+Nested regions are handled by nesting depth, so counters in lettering stay
+open and islands inside those counters still engrave.
 
 Default dimensions (mm), from a well-tested set of printed bins:
 
@@ -99,12 +127,16 @@ and run anywhere:
 
 ```
 python3 GridfinityBatteryBinGenerator/tests/test_layout.py      # packing + height math
+python3 GridfinityBatteryBinGenerator/tests/test_logo.py        # logo placement, nesting, SVG rewriting
 python3 GridfinityBatteryBinGenerator/tests/test_entry_sim.py   # dialog logic against a stubbed Fusion API
+python3 GridfinityBatteryBinGenerator/tests/test_packaging.py   # version/publisher consistency across manifest + installer
 ```
 
-`installer/` holds the Windows MSI sources (`make_wxs.py` regenerates the WiX
-source from the tree; `build.ps1` documents the build) and the
-`PackageContents.xml` used for the Autodesk App Store `.bundle` submission.
+`installer/` holds the Windows MSI sources: `make_wxs.py` regenerates the WiX
+source from the tree, `License.rtf` is the licence page shown during install,
+and `build.ps1` documents the build (the WiX **UI extension** is required, or
+the build fails on `WixUI_Minimal`). `PackageContents.xml` is used for the
+Autodesk App Store `.bundle` submission.
 
 ## License and credits
 

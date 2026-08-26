@@ -3,17 +3,28 @@
     <Product Id="*"
              Name="GridfinityBatteryBinGenerator for Autodesk Fusion"
              Language="1033"
-             Version="1.0.2"
-             Manufacturer="Gravlaxy"
+             Version="1.0.8"
+             Manufacturer="Bryan Gravely"
              UpgradeCode="{6f2a8f10-9c53-4b7e-8d21-b7a4f0c2d9a1}">
         <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
-                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.0.2"
-                 Manufacturer="Gravlaxy"/>
+                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.0.8"
+                 Manufacturer="Bryan Gravely"/>
         <MediaTemplate EmbedCab="yes"/>
+        <!-- WixUI_Minimal: licence page, progress, and a Finish page that
+             actually confirms the install worked. Requires the UI extension
+             at build time. wixl picks up License.rtf from the build folder;
+             the WiX Toolset needs it passed explicitly (see build.ps1). -->
+        <UIRef Id="WixUI_Minimal"/>
+        <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Restart Autodesk Fusion, then find Gridfinity Battery Bin under Solid - Create."/>
         <MajorUpgrade AllowSameVersionUpgrades="yes"
                       DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
-        <Property Id="ARPNOMODIFY" Value="1"/>
+        <!-- ARPNOMODIFY is set by WixUI_Minimal; defining it here too
+             collides on the Property table primary key. -->
         <Property Id="ARPCOMMENTS" Value="Gridfinity battery storage bin generator add-in for Autodesk Fusion"/>
+        <Property Id="ARPURLINFOABOUT" Value="https://github.com/bkgravely/GridfinityBatteryBinGenerator"/>
+        <!-- icon shown beside the entry in Add/Remove Programs -->
+        <Icon Id="ProductIcon.ico" SourceFile="ProductIcon.ico"/>
+        <Property Id="ARPPRODUCTICON" Value="ProductIcon.ico"/>
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFiles64Folder">
                 <Directory Id="dirAutodesk" Name="Autodesk">
@@ -55,6 +66,9 @@
                                         <Component Id="cmp_commands_commandCreateBatteryBin_resources_64x64_png" Guid="{BD5AB7E3-D5B8-525F-8145-117EA2A17BAB}">
                                             <File Id="fil_commands_commandCreateBatteryBin_resources_64x64_png" Name="64x64.png" Source="GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/64x64.png" KeyPath="yes"/>
                                         </Component>
+                                        <Component Id="cmp_commands_commandCreateBatteryBin_resources_logo_svg" Guid="{81D3B3C9-F0BB-5EF8-92FE-5135002023FC}">
+                                            <File Id="fil_commands_commandCreateBatteryBin_resources_logo_svg" Name="logo.svg" Source="GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/logo.svg" KeyPath="yes"/>
+                                        </Component>
                                     </Directory>
                                 </Directory>
                             </Directory>
@@ -71,6 +85,9 @@
                                     </Component>
                                     <Component Id="cmp_lib_batteryUtils_layout_py" Guid="{FABDA891-9D02-5F4C-B112-CE9D1DCC185D}">
                                         <File Id="fil_lib_batteryUtils_layout_py" Name="layout.py" Source="GridfinityBatteryBinGenerator/lib/batteryUtils/layout.py" KeyPath="yes"/>
+                                    </Component>
+                                    <Component Id="cmp_lib_batteryUtils_logoUtils_py" Guid="{F6E6E32A-586E-598B-9A32-B4698A42E904}">
+                                        <File Id="fil_lib_batteryUtils_logoUtils_py" Name="logoUtils.py" Source="GridfinityBatteryBinGenerator/lib/batteryUtils/logoUtils.py" KeyPath="yes"/>
                                     </Component>
                                 </Directory>
                                 <Directory Id="dir_lib_fusion360utils" Name="fusion360utils">
@@ -183,10 +200,12 @@
             <ComponentRef Id="cmp_commands_commandCreateBatteryBin_resources_16x16_png"/>
             <ComponentRef Id="cmp_commands_commandCreateBatteryBin_resources_32x32_png"/>
             <ComponentRef Id="cmp_commands_commandCreateBatteryBin_resources_64x64_png"/>
+            <ComponentRef Id="cmp_commands_commandCreateBatteryBin_resources_logo_svg"/>
             <ComponentRef Id="cmp_config_py"/>
             <ComponentRef Id="cmp_lib_batteryUtils___init___py"/>
             <ComponentRef Id="cmp_lib_batteryUtils_batteryDefs_py"/>
             <ComponentRef Id="cmp_lib_batteryUtils_layout_py"/>
+            <ComponentRef Id="cmp_lib_batteryUtils_logoUtils_py"/>
             <ComponentRef Id="cmp_lib_configUtils_py"/>
             <ComponentRef Id="cmp_lib_fusion360utils___init___py"/>
             <ComponentRef Id="cmp_lib_fusion360utils_event_utils_py"/>

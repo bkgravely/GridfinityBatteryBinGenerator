@@ -30,7 +30,7 @@ defsMod = __import__(pkgName + '.lib.batteryUtils.batteryDefs', fromlist=['batte
 # make .cast() a passthrough so our fakes flow through readParams
 for clsName in ('ValueCommandInput', 'IntegerSpinnerCommandInput',
                 'BoolValueCommandInput', 'TextBoxCommandInput',
-                'DropDownCommandInput'):
+                'StringValueCommandInput', 'DropDownCommandInput'):
     getattr(adsk.core, clsName).cast = lambda x: x
 
 PASS = 0
@@ -206,6 +206,56 @@ check('9V after switch: slot width 17.5',
 check('9V after switch validates (OK not greyed)', fireValidate(inputs) is True)
 p = entry.readParams(inputs)
 check('9V after switch: 10 slots', p['layout']['count'] == 10, p['layout'])
+
+
+# ---- the name users actually see in Solid > Create
+check('command is named for the menu', entry.CMD_NAME == 'Gridfinity Battery Bin', entry.CMD_NAME)
+check('description mentions every battery type',
+      all(b in entry.CMD_Description for b in ('AAA', 'AA', 'CR123', '9V', '18650')),
+      entry.CMD_Description)
+check('dialog blurb matches the command name',
+      'Gridfinity Battery Bin' in entry.INFO_TEXT, entry.INFO_TEXT[:80])
+
+# ---- logo is fixed, not a dialog option: same on every bin, always on
+logoMod = __import__(pkgName + '.lib.batteryUtils.logoUtils', fromlist=['logoUtils'])
+
+for bat in defsMod.BATTERY_TYPES:
+    p = entry.readParams(makeInputs(battery=bat))
+    check(bat + ' logo path is the bundled one', p['logoPath'] == entry.BUNDLED_LOGO_PATH)
+    check(bat + ' logo on corner foot', p['logoPlacement'] == 'Corner foot', p['logoPlacement'])
+    check(bat + ' logo size fixed', abs(p['logoSize'] - logoMod.LOGO_SIZE) < 1e-9)
+    check(bat + ' logo depth fixed', abs(p['logoDepth'] - logoMod.LOGO_DEPTH) < 1e-9)
+    check(bat + ' logo not re-mirrored', p['logoMirror'] is False)
+    check(bat + ' logo not rotated', p['logoRotation'] == 0)
+    check(bat + ' logo adds no errors', p['errors'] == [], p['errors'])
+    check(bat + ' logo adds no warnings', p['warnings'] == [], p['warnings'])
+    check(bat + ' result reports the logo', 'Logo engraved' in entry.formatResultText(p))
+
+# no logo controls may leak back into the dialog
+for leaked in ('LOGO_ENABLED_ID', 'LOGO_PATH_ID', 'LOGO_BROWSE_ID', 'LOGO_SIZE_ID',
+               'LOGO_PLACEMENT_ID', 'LOGO_MIRROR_ID', 'LOGO_ROTATION_ID', 'LOGO_DEPTH_ID'):
+    check('no ' + leaked + ' input', not hasattr(entry, leaked))
+
+# the bundled artwork must actually be there and be importable vector art
+check('bundled logo exists', os.path.isfile(entry.BUNDLED_LOGO_PATH))
+with open(entry.BUNDLED_LOGO_PATH, 'r', encoding='utf-8') as handle:
+    logoText = handle.read()
+check('bundled logo is svg', '<svg' in logoText)
+check('bundled logo has paths', logoText.count('<path') >= 1, logoText.count('<path'))
+check('bundled logo has no live text', '<text' not in logoText)
+check('bundled logo fits a foot',
+      logoMod.LOGO_SIZE <= logoMod.maxLogoWidth(42.0, 0.25) + 1e-9,
+      (logoMod.LOGO_SIZE, logoMod.maxLogoWidth(42.0, 0.25)))
+
+# a missing bundled file is the one logo condition that blocks generation
+inputs = makeInputs(battery='AA')
+realPath = entry.BUNDLED_LOGO_PATH
+try:
+    entry.BUNDLED_LOGO_PATH = 'C:/nope/missing.svg'
+    p = entry.readParams(inputs)
+    check('missing bundled logo errors', any('reinstall' in e for e in p['errors']), p['errors'])
+finally:
+    entry.BUNDLED_LOGO_PATH = realPath
 
 print('regression: {} passed, {} failed'.format(PASS, FAIL))
 sys.exit(1 if FAIL else 0)

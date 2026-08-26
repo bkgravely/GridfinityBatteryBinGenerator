@@ -1,6 +1,7 @@
 import adsk.core, adsk.fusion, traceback
 import os
 import math
+import tempfile
 
 from ...lib import configUtils
 from ...lib import fusion360utils as futil
@@ -18,13 +19,14 @@ from ...lib.gridfinityUtils.binBodyCutoutGeneratorInput import BinBodyCutoutGene
 from ...lib.ui.unsupportedDesignTypeException import UnsupportedDesignTypeException
 from ...lib.batteryUtils import layout
 from ...lib.batteryUtils import batteryDefs
+from ...lib.batteryUtils import logoUtils
 
 app = adsk.core.Application.get()
 ui = app.userInterface
 
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_cmdBatteryBin'
-CMD_NAME = 'Battery bin'
-CMD_Description = ('Create a gridfinity bin with a maximized grid of tip-down '
+CMD_NAME = 'Gridfinity Battery Bin'
+CMD_Description = ('Create a Gridfinity bin with a maximized grid of tip-down '
                    'battery slots (AAA, AA, CR123, 9V, 18650)')
 
 IS_PROMOTED = True
@@ -87,7 +89,10 @@ XY_CLEARANCE_ID = 'bb_xy_clearance'
 SHOW_PREVIEW_ID = 'bb_show_preview'
 RESULT_TEXT_ID = 'bb_result_text'
 
-INFO_TEXT = ('<b>Battery bin generator</b> — builds a gridfinity bin '
+BUNDLED_LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'resources', 'logo.svg')
+
+INFO_TEXT = ('<b>Gridfinity Battery Bin</b> — builds a Gridfinity bin '
              '(geometry from the GridfinityGenerator add-in library) and cuts a '
              'maximized grid of tip-down battery slots with a tip recess so the '
              'battery rests on its shoulder, never on the button. '
@@ -178,6 +183,7 @@ def applyBatteryDefaults(inputs: adsk.core.CommandInputs):
     inputs.itemById(TIP_WIDTH_ID).isVisible = not isRound
 
 
+
 # ------------------------------------------------------------------ parameters
 def readParams(inputs: adsk.core.CommandInputs):
     """Read every dialog input, run the layout + height math, and collect
@@ -223,6 +229,15 @@ def readParams(inputs: adsk.core.CommandInputs):
     p['baseLengthUnit'] = mm(BASE_LENGTH_UNIT_ID)
     p['heightUnitMm'] = mm(HEIGHT_UNIT_ID)
     p['xyClearance'] = mm(XY_CLEARANCE_ID)
+
+    # the logo is not a dialog option - every bin carries it, always.
+    # everything about it is fixed in lib/batteryUtils/logoUtils.py
+    p['logoPath'] = BUNDLED_LOGO_PATH
+    p['logoPlacement'] = logoUtils.LOGO_PLACEMENT
+    p['logoSize'] = logoUtils.LOGO_SIZE
+    p['logoDepth'] = logoUtils.LOGO_DEPTH
+    p['logoRotation'] = logoUtils.LOGO_ROTATION
+    p['logoMirror'] = logoUtils.LOGO_MIRROR
 
     errors = []
     warnings = []
@@ -291,6 +306,14 @@ def readParams(inputs: adsk.core.CommandInputs):
                         'Increase bin height to at least {} u.'.format(
                             p['fit']['baseDip'], p['baseDipAllowance'], autoUnits))
 
+    if not os.path.isfile(p['logoPath']):
+        errors.append('The bundled logo is missing from the add-in (expected '
+                      'resources/logo.svg); reinstall the add-in to restore it.')
+    maxLogo = logoUtils.maxLogoWidth(p['baseWidthUnit'], p['xyClearance'])
+    if p['logoSize'] > maxLogo + 1e-6:
+        warnings.append('Logo is {:.1f} mm but a foot only offers {:.1f} mm of flat face; '
+                        'the edges will run into the foot chamfer.'.format(p['logoSize'], maxLogo))
+
     p['errors'] = errors
     p['warnings'] = warnings
     return p
@@ -312,6 +335,9 @@ def formatResultText(p):
     if f['margin'] >= -1e-6:
         lines.append('Stackable: battery top {:.1f} mm, {:.1f} mm below wall top'.format(
             f['batteryTop'], f['wallTop'] - f['batteryTop']))
+    if not p['errors']:
+        lines.append('Logo engraved on the {}: {:.0f} mm, {:.1f} mm deep'.format(
+            p['logoPlacement'].lower(), p['logoSize'], p['logoDepth']))
     for w in p['warnings']:
         lines.append('<font color="#aa5500"><b>Warning:</b> {}</font>'.format(w))
     for e in p['errors']:
@@ -481,6 +507,176 @@ def command_destroy(args: adsk.core.CommandEventArgs):
     futil.log(f'{CMD_NAME} Command Destroy Event')
 
 
+# --------------------------------------------------------------- logo engraving
+class LogoError(Exception):
+    """Raised when the artwork itself is the problem, so the message shown to
+    the user talks about the SVG rather than about Fusion."""
+
+
+def curve3dBounds(curve3d):
+    """(minX, minY, maxX, maxY) of a Curve3D.
+
+    Goes through the curve's evaluator so lines, arcs, ellipses and splines
+    are all measured the same way - an imported logo can contain any of them.
+    """
+    try:
+        evaluator = curve3d.evaluator
+        (ok, startParam, endParam) = evaluator.getParameterExtents()
+        if not ok:
+            return None
+        (ok, points) = evaluator.getStrokes(startParam, endParam, 0.01)
+        if not ok or not points:
+            return None
+        xs = [point.x for point in points]
+        ys = [point.y for point in points]
+        return (min(xs), min(ys), max(xs), max(ys))
+    except Exception:
+        return None
+
+
+def unionBounds(boxes):
+    boxes = [box for box in boxes if box]
+    if not boxes:
+        return None
+    return (min(box[0] for box in boxes), min(box[1] for box in boxes),
+            max(box[2] for box in boxes), max(box[3] for box in boxes))
+
+
+def sketchCurveBounds(sketch: adsk.fusion.Sketch):
+    return unionBounds([curve3dBounds(curve.geometry) for curve in sketch.sketchCurves])
+
+
+def profileOuterBounds(profile: adsk.fusion.Profile):
+    boxes = []
+    for loop in profile.profileLoops:
+        if not loop.isOuter:
+            continue
+        for profileCurve in loop.profileCurves:
+            boxes.append(curve3dBounds(profileCurve.geometry))
+    return unionBounds(boxes)
+
+
+def importLogoSketch(component: adsk.fusion.Component, plane, svgPath, scale, name,
+                     originX=0.0, originY=0.0):
+    """Import the SVG into a new sketch at the given sketch-space offset.
+
+    Position is set at import time on purpose. Fusion brings SVG geometry in
+    as fixed curves, so Sketch.move quietly refuses to shift them afterwards -
+    which leaves the artwork off the model and the cut with nothing to remove.
+    """
+    sketch = component.sketches.add(plane)
+    sketch.name = name
+    if not sketch.importSVG(svgPath, originX, originY, scale):
+        sketch.deleteMe()
+        raise LogoError('Fusion could not import this SVG. It needs real paths - '
+                        'any lettering must be converted to outlines first.')
+    return sketch
+
+
+def measureImportedLogo(component, plane, svgPath, scale):
+    """Import once into a throwaway sketch and report the bounding box."""
+    probe = importLogoSketch(component, plane, svgPath, scale, 'Logo probe')
+    bounds = sketchCurveBounds(probe)
+    probe.deleteMe()
+    return bounds
+
+
+def engraveLogo(component: adsk.fusion.Component, binBody, p, CM):
+    """Cut the logo into the flat bottom face of the chosen gridfinity foot.
+
+    The sketch sits on the printed bottom face and the cut runs upwards into
+    the foot, so the mark is always recessed - a raised logo would hold the
+    bin off the build plate and off a baseplate.
+    """
+    svgPath = logoUtils.orientedSvgPath(p['logoPath'], p['logoMirror'],
+                                        p['logoRotation'], tempfile.gettempdir())
+
+    planeInput: adsk.fusion.ConstructionPlaneInput = component.constructionPlanes.createInput()
+    planeInput.setByOffset(component.xYConstructionPlane,
+                           adsk.core.ValueInput.createByReal(logoUtils.bottomZ() * CM))
+    logoPlane = component.constructionPlanes.add(planeInput)
+    logoPlane.name = 'Logo plane'
+
+    # measure the artwork at 1:1 first - an SVG's own units tell us nothing
+    # about how big Fusion will draw it, so scale is derived from what lands
+    rawBounds = measureImportedLogo(component, logoPlane, svgPath, 1.0)
+    if rawBounds is None:
+        raise LogoError('The SVG produced no curves Fusion could measure.')
+    rawSize = max(rawBounds[2] - rawBounds[0], rawBounds[3] - rawBounds[1])
+    if rawSize <= 1e-9:
+        raise LogoError('The SVG artwork has no size.')
+    scale = (p['logoSize'] * CM) / rawSize
+
+    # measure again at the real scale to learn exactly where an import lands,
+    # so the final one can be offset straight onto the foot
+    scaledBounds = measureImportedLogo(component, logoPlane, svgPath, scale)
+    if scaledBounds is None:
+        raise LogoError('The scaled SVG produced no curves.')
+    scaledCenterX = (scaledBounds[0] + scaledBounds[2]) / 2.0
+    scaledCenterY = (scaledBounds[1] + scaledBounds[3]) / 2.0
+
+    centers = logoUtils.footCenters(p['binX'], p['binY'], p['baseWidthUnit'],
+                                    p['baseLengthUnit'], p['xyClearance'],
+                                    p['logoPlacement'])
+    extrudeFeatures: adsk.fusion.ExtrudeFeatures = component.features.extrudeFeatures
+    tolerance = 0.01  # cm; 0.1 mm is far tighter than any visible misplacement
+
+    for index, (centerX, centerY) in enumerate(centers):
+        name = 'Logo' if len(centers) == 1 else 'Logo {}'.format(index + 1)
+        targetX = centerX * CM
+        targetY = centerY * CM
+        sketch = importLogoSketch(component, logoPlane, svgPath, scale, name,
+                                  targetX - scaledCenterX, targetY - scaledCenterY)
+
+        placedBounds = sketchCurveBounds(sketch)
+        if placedBounds is None:
+            raise LogoError('The scaled SVG produced no curves.')
+        errorX = targetX - (placedBounds[0] + placedBounds[2]) / 2.0
+        errorY = targetY - (placedBounds[1] + placedBounds[3]) / 2.0
+
+        if abs(errorX) > tolerance or abs(errorY) > tolerance:
+            # import offset did not behave as a plain translation; try nudging
+            # the curves instead, then insist on the result rather than
+            # cutting thin air the way a silent miss would
+            move = adsk.core.Matrix3D.create()
+            move.translation = adsk.core.Vector3D.create(errorX, errorY, 0)
+            sketch.move(commonUtils.objectCollectionFromList(
+                [curve for curve in sketch.sketchCurves]), move)
+            placedBounds = sketchCurveBounds(sketch)
+            errorX = targetX - (placedBounds[0] + placedBounds[2]) / 2.0
+            errorY = targetY - (placedBounds[1] + placedBounds[3]) / 2.0
+            if abs(errorX) > tolerance or abs(errorY) > tolerance:
+                raise LogoError(
+                    'The logo could not be positioned on the foot - it landed '
+                    '{:.1f} mm / {:.1f} mm away from the target.'.format(
+                        errorX / CM, errorY / CM))
+
+        profiles = [profile for profile in sketch.profiles]
+        if not profiles:
+            raise LogoError('The SVG has no closed shapes to engrave - every path that '
+                            'should be cut has to form a closed loop.')
+        boxes = [profileOuterBounds(profile) for profile in profiles]
+        if any(box is None for box in boxes):
+            regions = profiles
+        else:
+            regions = [profiles[i] for i in logoUtils.keepByNestingParity(boxes)]
+        if not regions:
+            raise LogoError('Every region in the SVG looked like a hole; check the artwork.')
+
+        cutInput = extrudeFeatures.createInput(
+            commonUtils.objectCollectionFromList(regions),
+            adsk.fusion.FeatureOperations.CutFeatureOperation)
+        cutInput.participantBodies = [binBody]
+        # Symmetric rather than one-sided: the sketch plane is offset DOWNWARDS
+        # to the printed face, and a one-sided cut depends on which way that
+        # plane's normal ends up pointing. Cutting the same depth either side
+        # takes the material above the face and harmlessly sweeps air below,
+        # so the engraving is the right depth whichever way the normal faces.
+        cutInput.setSymmetricExtent(
+            adsk.core.ValueInput.createByReal(p['logoDepth'] * CM * 2.0), True)
+        extrudeFeatures.add(cutInput).name = name + ' engrave'
+
+
 # ------------------------------------------------------------------ generation
 def generateBatteryBin(args: adsk.core.CommandEventArgs):
     try:
@@ -643,6 +839,9 @@ def generateBatteryBin(args: adsk.core.CommandEventArgs):
             adsk.core.ValueInput.createByReal(0))
         slotExtrude.add(tipCutInput).name = 'Battery tip recess cuts'
 
+        # ---- logo engraved into the printed bottom face (always)
+        engraveLogo(component, binBody, p, CM)
+
         binBody.name = binName
 
         binGroup = des.timeline.timelineGroups.add(originalTimelineCount, des.timeline.count - 1)
@@ -651,6 +850,13 @@ def generateBatteryBin(args: adsk.core.CommandEventArgs):
         args.executeFailed = True
         args.executeFailedMessage = ('Design type is unsupported. Projects with disabled design '
                                      'history are unsupported, please enable timeline to proceed.')
+        return False
+    except LogoError as err:
+        args.executeFailed = True
+        args.executeFailedMessage = ('The logo could not be engraved: {}<br>The artwork lives at '
+                                     'commands/commandCreateBatteryBin/resources/logo.svg '
+                                     'inside the add-in.'.format(err))
+        futil.log(f'{CMD_NAME} Logo error, {err}')
         return False
     except Exception:
         args.executeFailed = True
