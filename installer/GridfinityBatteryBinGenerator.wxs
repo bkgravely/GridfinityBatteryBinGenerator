@@ -3,11 +3,11 @@
     <Product Id="*"
              Name="GridfinityBatteryBinGenerator for Autodesk Fusion"
              Language="1033"
-             Version="1.0.8"
+             Version="1.1.0"
              Manufacturer="Bryan Gravely"
              UpgradeCode="{6f2a8f10-9c53-4b7e-8d21-b7a4f0c2d9a1}">
         <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
-                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.0.8"
+                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.1.0"
                  Manufacturer="Bryan Gravely"/>
         <MediaTemplate EmbedCab="yes"/>
         <!-- WixUI_Minimal: licence page, progress, and a Finish page that

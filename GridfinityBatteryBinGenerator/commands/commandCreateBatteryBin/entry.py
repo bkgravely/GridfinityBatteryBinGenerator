@@ -56,6 +56,9 @@ BIN_WIDTH_ID = 'bb_bin_width_u'
 BIN_LENGTH_ID = 'bb_bin_length_u'
 AUTO_HEIGHT_ID = 'bb_auto_height'
 BIN_HEIGHT_ID = 'bb_bin_height_u'
+BIN_HEIGHT_MM_ID = 'bb_bin_height_mm'
+CONSTRAIN_UNITS_ID = 'bb_constrain_units'
+LAYER_HEIGHT_ID = 'bb_layer_height'
 
 SLOT_DIA_LEN_ID = 'bb_slot_dia_len'
 SLOT_WIDTH_ID = 'bb_slot_width'
@@ -70,7 +73,8 @@ MIN_SPACING_ID = 'bb_min_spacing'
 WALL_CLEARANCE_ID = 'bb_wall_clearance'
 LEDGE_FILLET_ID = 'bb_ledge_fillet'
 HEADROOM_ID = 'bb_headroom'
-BASE_DIP_ID = 'bb_base_dip'
+MIN_FLOOR_ID = 'bb_min_floor'
+MIXED_LAYOUT_ID = 'bb_mixed_layout'
 
 WITH_LIP_ID = 'bb_with_lip'
 LIP_NOTCHES_ID = 'bb_lip_notches'
@@ -200,6 +204,8 @@ def readParams(inputs: adsk.core.CommandInputs):
     p['binX'] = adsk.core.IntegerSpinnerCommandInput.cast(inputs.itemById(BIN_WIDTH_ID)).value
     p['binY'] = adsk.core.IntegerSpinnerCommandInput.cast(inputs.itemById(BIN_LENGTH_ID)).value
     p['autoHeight'] = adsk.core.BoolValueCommandInput.cast(inputs.itemById(AUTO_HEIGHT_ID)).value
+    p['constrainUnits'] = adsk.core.BoolValueCommandInput.cast(
+        inputs.itemById(CONSTRAIN_UNITS_ID)).value
 
     p['slotDiaLen'] = mm(SLOT_DIA_LEN_ID)
     p['slotWidth'] = mm(SLOT_WIDTH_ID)
@@ -214,7 +220,10 @@ def readParams(inputs: adsk.core.CommandInputs):
     p['wallClearance'] = mm(WALL_CLEARANCE_ID)
     p['ledgeFillet'] = mm(LEDGE_FILLET_ID)
     p['headroom'] = mm(HEADROOM_ID)
-    p['baseDipAllowance'] = mm(BASE_DIP_ID)
+    p['minFloor'] = mm(MIN_FLOOR_ID)
+    p['layerHeight'] = mm(LAYER_HEIGHT_ID)
+    p['allowMixed'] = adsk.core.BoolValueCommandInput.cast(
+        inputs.itemById(MIXED_LAYOUT_ID)).value
 
     p['withLip'] = adsk.core.BoolValueCommandInput.cast(inputs.itemById(WITH_LIP_ID)).value
     p['lipNotches'] = adsk.core.BoolValueCommandInput.cast(inputs.itemById(LIP_NOTCHES_ID)).value
@@ -242,17 +251,37 @@ def readParams(inputs: adsk.core.CommandInputs):
     errors = []
     warnings = []
 
-    # height (in gridfinity units)
+    # Height. Gridfinity fixes the 42 mm footprint but not the height, so the
+    # unit grid is optional: unconstrained, the bin is only as tall as the
+    # cuts require instead of rounding up to the next 7 mm.
     baseHeightMm = const.BIN_BASE_HEIGHT * 10.0
     autoUnits = layout.autoMinHeightUnits(
-        p['ledgeDrop'], p['slotDepth'], p['tipDepth'], p['baseDipAllowance'],
+        p['ledgeDrop'], p['slotDepth'], p['tipDepth'], p['minFloor'],
         p['heightUnitMm'], baseHeightMm)
+    autoFreeUnits = layout.unitsForWallTop(
+        layout.minWallTop(p['ledgeDrop'], p['slotDepth'], p['tipDepth'], p['minFloor']),
+        p['heightUnitMm'], baseHeightMm)
+    # land the top face on a layer boundary - the exact minimum height is an
+    # arbitrary number of mm and would otherwise end part way through a layer
+    if p['layerHeight'] > 0:
+        autoFreeUnits = layout.unitsForTotalHeight(
+            layout.snapUp(layout.totalHeight(autoFreeUnits, p['heightUnitMm'], baseHeightMm),
+                          p['layerHeight']),
+            p['heightUnitMm'], baseHeightMm)
     heightSpinner = adsk.core.IntegerSpinnerCommandInput.cast(inputs.itemById(BIN_HEIGHT_ID))
+
     if p['autoHeight']:
-        p['units'] = autoUnits
-    else:
+        p['units'] = autoUnits if p['constrainUnits'] else autoFreeUnits
+    elif p['constrainUnits']:
         p['units'] = heightSpinner.value
+    else:
+        p['units'] = layout.unitsForWallTop(
+            mm(BIN_HEIGHT_MM_ID) - baseHeightMm, p['heightUnitMm'], baseHeightMm)
+
     p['autoUnits'] = autoUnits
+    p['autoFreeUnits'] = autoFreeUnits
+    p['totalHeightMm'] = layout.totalHeight(p['units'], p['heightUnitMm'], baseHeightMm)
+    p['autoHeightMm'] = layout.totalHeight(autoFreeUnits, p['heightUnitMm'], baseHeightMm)
 
     # outer body + floor dimensions
     p['bodyW'] = p['baseWidthUnit'] * p['binX'] - 2.0 * p['xyClearance']
@@ -268,7 +297,17 @@ def readParams(inputs: adsk.core.CommandInputs):
     else:
         p['layout'] = layout.computeRectLayout(
             p['floorW'], p['floorL'], p['slotDiaLen'], p['slotWidth'],
-            p['minSpacing'], p['wallClearance'])
+            p['minSpacing'], p['wallClearance'], p['allowMixed'])
+
+    # what turning mixed orientations back on would be worth, so the choice is
+    # an informed one rather than a silent loss of capacity
+    p['mixedGain'] = 0
+    if not p['isRound'] and not p['allowMixed'] and p['layout'] is not None:
+        alt = layout.computeRectLayout(
+            p['floorW'], p['floorL'], p['slotDiaLen'], p['slotWidth'],
+            p['minSpacing'], p['wallClearance'], True)
+        if alt is not None:
+            p['mixedGain'] = alt['count'] - p['layout']['count']
 
     # vertical stack-up
     p['fit'] = layout.fitCheck(
@@ -301,10 +340,28 @@ def readParams(inputs: adsk.core.CommandInputs):
             warnings.append('Battery top is within {:.1f} mm of the wall top '
                             '(wanted {:.1f} mm of headroom).'.format(
                                 -protrusion, p['headroom']))
-    if not p['autoHeight'] and p['fit']['baseDip'] > p['baseDipAllowance'] + 1e-6:
-        warnings.append('Slots reach {:.1f} mm into the base studs (allowance {:.1f} mm). '
-                        'Increase bin height to at least {} u.'.format(
-                            p['fit']['baseDip'], p['baseDipAllowance'], autoUnits))
+    if p['units'] < 1.0 - 1e-9:
+        minMm = layout.totalHeight(1.0, p['heightUnitMm'], baseHeightMm)
+        errors.append('Bin height must be at least {:.1f} mm - below that there is no '
+                      'body above the gridfinity base.'.format(minMm))
+    if not p['autoHeight'] and p['fit']['floorThickness'] < p['minFloor'] - 1e-6:
+        floor = p['fit']['floorThickness']
+        if floor <= 0:
+            warnings.append('Slots cut through the bottom of the bin by {:.1f} mm. The feet '
+                            'do not cover the whole underside, so any slot landing over the '
+                            'gap between two feet will break through and expose the battery. '
+                            'Increase bin height to at least {} u.'.format(-floor, autoUnits))
+        else:
+            warnings.append('Only {:.1f} mm of floor left under the slots (wanted {:.1f} mm). '
+                            'Increase bin height to at least {} u.'.format(
+                                floor, p['minFloor'], autoUnits))
+
+    if (not p['autoHeight'] and not p['constrainUnits'] and p['layerHeight'] > 0
+            and not layout.isMultipleOf(p['totalHeightMm'], p['layerHeight'])):
+        warnings.append('Bin height {:.2f} mm is not a whole number of {:g} mm layers, so '
+                        'the top face ends part way through one. The next multiple up is '
+                        '{:.2f} mm.'.format(p['totalHeightMm'], p['layerHeight'],
+                                            layout.snapUp(p['totalHeightMm'], p['layerHeight'])))
 
     if not os.path.isfile(p['logoPath']):
         errors.append('The bundled logo is missing from the add-in (expected '
@@ -326,9 +383,22 @@ def formatResultText(p):
             p['battery'], p['layout']['count'], p['layout']['desc']))
     else:
         lines.append('<b>{}: no batteries fit</b>'.format(p['battery']))
-    totalH = p['units'] * p['heightUnitMm']
-    lines.append('Bin {}x{}x{} u  =  {:.1f} x {:.1f} x {:.1f} mm'.format(
-        p['binX'], p['binY'], p['units'], p['bodyW'], p['bodyL'], totalH))
+    if p.get('mixedGain', 0) > 0:
+        lines.append('{} more would fit with mixed slot orientations allowed'.format(
+            p['mixedGain']))
+    if p['constrainUnits']:
+        height = '{:g} u'.format(p['units'])
+    else:
+        height = '{:.2f} mm ({:.2f} u)'.format(p['totalHeightMm'], p['units'])
+    lines.append('Bin {}x{} x {}  =  {:.1f} x {:.1f} x {:.2f} mm'.format(
+        p['binX'], p['binY'], height, p['bodyW'], p['bodyL'], p['totalHeightMm']))
+    if not p['constrainUnits'] and p['layerHeight'] > 0:
+        lines.append('Height rounded up to a whole {:g} mm layer'.format(p['layerHeight']))
+    if p['constrainUnits']:
+        saved = p['totalHeightMm'] - p['autoHeightMm']
+        if saved > 0.05:
+            lines.append('Unconstrained height would be {:.1f} mm, '
+                         '{:.1f} mm shorter'.format(p['autoHeightMm'], saved))
     f = p['fit']
     lines.append('Wall top {:.1f} / ledge {:.1f} / slot bottom {:.1f} / recess {:.1f} mm'.format(
         f['wallTop'], f['ledgeZ'], f['slotBottomZ'], f['recessBottomZ']))
@@ -353,9 +423,25 @@ def updateComputed(inputs: adsk.core.CommandInputs):
     try:
         p = readParams(inputs)
         heightSpinner = adsk.core.IntegerSpinnerCommandInput.cast(inputs.itemById(BIN_HEIGHT_ID))
+        heightMm = adsk.core.ValueCommandInput.cast(inputs.itemById(BIN_HEIGHT_MM_ID))
+        # only the control matching the current mode is shown, and it is
+        # read-only while auto height is driving it
+        heightSpinner.isVisible = p['constrainUnits']
+        heightMm.isVisible = not p['constrainUnits']
+        layerHeight = adsk.core.ValueCommandInput.cast(inputs.itemById(LAYER_HEIGHT_ID))
+        # the layer step only means anything off the 7 mm unit grid
+        layerHeight.isVisible = not p['constrainUnits']
+        # and mixed orientations only mean anything for rectangular slots
+        mixed = adsk.core.BoolValueCommandInput.cast(inputs.itemById(MIXED_LAYOUT_ID))
+        mixed.isVisible = not p['isRound']
         heightSpinner.isEnabled = not p['autoHeight']
-        if p['autoHeight'] and heightSpinner.value != p['units']:
-            heightSpinner.value = p['units']
+        heightMm.isEnabled = not p['autoHeight']
+        if p['autoHeight']:
+            if p['constrainUnits']:
+                if heightSpinner.value != int(round(p['units'])):
+                    heightSpinner.value = int(round(p['units']))
+            elif abs(heightMm.value - p['totalHeightMm'] / 10.0) > 1e-9:
+                heightMm.value = p['totalHeightMm'] / 10.0
         resultText = adsk.core.TextBoxCommandInput.cast(inputs.itemById(RESULT_TEXT_ID))
         resultText.formattedText = formatResultText(p)
         return p
@@ -395,8 +481,16 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     sizeGroup.children.addIntegerSpinnerCommandInput(BIN_WIDTH_ID, 'Bin width, X (u)', 1, 20, 1, 2)
     sizeGroup.children.addIntegerSpinnerCommandInput(BIN_LENGTH_ID, 'Bin length, Y (u)', 1, 20, 1, 3)
     sizeGroup.children.addBoolValueInput(AUTO_HEIGHT_ID, 'Auto height (minimum for battery)', True, '', True)
+    sizeGroup.children.addBoolValueInput(
+        CONSTRAIN_UNITS_ID, 'Constrain height to gridfinity units', True, '', False)
     heightSpinner = sizeGroup.children.addIntegerSpinnerCommandInput(BIN_HEIGHT_ID, 'Bin height, Z (u)', 1, 50, 1, 8)
     heightSpinner.isEnabled = False
+    heightSpinner.isVisible = False
+    heightMm = addMmInput(sizeGroup.children, BIN_HEIGHT_MM_ID, 'Bin height', 56.0)
+    heightMm.isEnabled = False
+    layerHeight = addMmInput(sizeGroup.children, LAYER_HEIGHT_ID, 'Round height to layer',
+                             batteryDefs.DEFAULT_LAYER_HEIGHT)
+    layerHeight.isVisible = False
 
     # slot dimensions
     slotGroup = inputs.addGroupCommandInput(SLOT_GROUP_ID, 'Slot dimensions')
@@ -416,7 +510,11 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     addMmInput(rulesGroup.children, WALL_CLEARANCE_ID, 'Min distance slot to wall', batteryDefs.DEFAULT_MIN_WALL_CLEARANCE)
     addMmInput(rulesGroup.children, LEDGE_FILLET_ID, 'Ledge-to-wall fillet radius', batteryDefs.DEFAULT_LEDGE_FILLET_RADIUS)
     addMmInput(rulesGroup.children, HEADROOM_ID, 'Battery headroom below wall top', batteryDefs.DEFAULT_HEADROOM)
-    addMmInput(rulesGroup.children, BASE_DIP_ID, 'Allowed cut into base studs', batteryDefs.DEFAULT_BASE_DIP_ALLOWANCE)
+    addMmInput(rulesGroup.children, MIN_FLOOR_ID, 'Min floor under slots',
+               batteryDefs.DEFAULT_MIN_FLOOR_THICKNESS)
+    rulesGroup.children.addBoolValueInput(
+        MIXED_LAYOUT_ID, 'Allow mixed slot orientations (9V)', True, '',
+        batteryDefs.DEFAULT_ALLOW_MIXED_LAYOUT)
 
     # bin features
     featuresGroup = inputs.addGroupCommandInput(FEATURES_GROUP_ID, 'Bin features')
@@ -702,8 +800,10 @@ def generateBatteryBin(args: adsk.core.CommandEventArgs):
         wall = p['wallThickness'] * CM
         binX, binY, units = p['binX'], p['binY'], p['units']
 
+        heightLabel = ('{:g}u'.format(units) if p['constrainUnits']
+                       else '{:.1f}mm'.format(p['totalHeightMm']))
         binName = 'Battery bin {} {}x{}x{} ({} cells)'.format(
-            p['battery'], binX, binY, units, p['layout']['count'])
+            p['battery'], binX, binY, heightLabel, p['layout']['count'])
 
         originalTimelineCount = des.timeline.count
         if des.designIntent == adsk.fusion.DesignIntentTypes.HybridDesignIntentType:
@@ -790,11 +890,13 @@ def generateBatteryBin(args: adsk.core.CommandEventArgs):
                 slotSketch.sketchCurves.sketchCircles.addByCenterRadius(
                     adsk.core.Point3D.create(wall + cx * CM, wall + cy * CM, 0), radius)
         else:
-            sx = p['layout']['slotX'] * CM
-            sy = p['layout']['slotY'] * CM
-            for (cx, cy) in centers:
+            # each slot carries its own footprint: a mixed layout turns some
+            # of them 90 degrees to use up the offcut a uniform grid leaves
+            for (cx, cy), (slotW, slotL) in zip(centers, p['layout']['slotSizes']):
                 x = wall + cx * CM
                 y = wall + cy * CM
+                sx = slotW * CM
+                sy = slotL * CM
                 slotSketch.sketchCurves.sketchLines.addTwoPointRectangle(
                     adsk.core.Point3D.create(x - sx / 2.0, y - sy / 2.0, 0),
                     adsk.core.Point3D.create(x + sx / 2.0, y + sy / 2.0, 0))
@@ -819,10 +921,11 @@ def generateBatteryBin(args: adsk.core.CommandEventArgs):
                 tipSketch.sketchCurves.sketchCircles.addByCenterRadius(
                     adsk.core.Point3D.create(wall + cx * CM, wall + cy * CM, 0), radius)
         else:
-            rotated = p['layout']['slotX'] < p['layout']['slotY']
-            tx = (p['tipWidth'] if rotated else p['tipDiaLen']) * CM
-            ty = (p['tipDiaLen'] if rotated else p['tipWidth']) * CM
-            for (cx, cy) in centers:
+            for (cx, cy), (slotW, slotL) in zip(centers, p['layout']['slotSizes']):
+                # the recess turns with the slot it sits in
+                rotated = slotW < slotL
+                tx = (p['tipWidth'] if rotated else p['tipDiaLen']) * CM
+                ty = (p['tipDiaLen'] if rotated else p['tipWidth']) * CM
                 x = wall + cx * CM
                 y = wall + cy * CM
                 tipSketch.sketchCurves.sketchLines.addTwoPointRectangle(

@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.1.0 — 2026-08-28
+
+Minor rather than patch: bins regenerated with this version are not
+dimensionally identical to 1.0.x ones. The 9V layout, the CR123 auto height and
+the engraved logo all change.
+
+- 9V slots are now packed in mixed orientations: the generator fills the strip
+  a uniform grid leaves over with a row turned 90 degrees. A 3x3 bin holds 18
+  instead of 15, a 2x3 holds 11 instead of 10, a 3x4 holds 26 instead of 25.
+  New "Allow mixed slot orientations" checkbox, default ON, turns it off for a
+  uniform grid; the readout then says how many cells that costs. The setting
+  is hidden for round batteries, which have no orientation to mix.
+- The 9V tip recess is 21 x 9 mm, measured with calipers rather than taken
+  from a nominal figure. The old 14 x 8 recess did not clear the snap
+  terminals. The battery still lands on a 3.2 mm shoulder at each end and
+  4.25 mm down each side.
+- Cuts must now leave a solid floor under them, 1 mm by default, replacing the
+  old 0.5 mm allowance for dipping into the base. The dip was only ever safe
+  where a recess happened to sit over a foot; the slot grid is centred on the
+  bin and not aligned to the 42 mm foot pitch, so on a 2x3 CR123 bin four of
+  the twenty recesses would have broken clean through the gap between feet.
+  CR123 auto height moves from 6 u to 7 u as a result.
+- New "Constrain height to gridfinity units" checkbox, default OFF. Gridfinity
+  fixes the 42 mm footprint but not the height, so a bin can now be exactly as
+  tall as its slots require instead of rounding up to the next 7 mm. Saves
+  2.4 mm on AAA, 3.4 on AA, 5.4 on CR123, 4.0 on 9V and 2.4 on 18650.
+- New "Round height to layer" input, 0.2 mm by default and shown only when the
+  height is not constrained to units, so a free height lands on a whole print
+  layer instead of part way through one. A manually typed height is never
+  overridden, only flagged in the readout.
+- The engraved logo grows from 28 mm to 31 mm, right at the ceiling a 35.1 mm
+  foot allows with the 2 mm chamfer margin.
+- New artwork, drawn with solid letterforms instead of outlined ones. The old
+  logo cut its second line as grooves around 0.41 mm wide, which closed up
+  under first-layer squish and cost the last letters on a print. Scaling alone
+  could not fix that - 31.1 mm is all a foot has - so the letters are now solid
+  shapes whose narrowest strokes measure 0.51 mm, clear of the roughly 0.5 mm
+  floor a 0.4 mm nozzle can hold. Same wordmark, same 28 contours, same 9
+  counters kept open by nesting parity.
+- Added `tools/bake_logo.py`, which produces the bundled `logo.svg` from
+  `docs/logo-source.svg`: it bakes the mirror and 90 degree rotation into the
+  path data, drops zero-length segments, and snaps every contour shut. That
+  preparation used to be a set of one-off commands; now it is a script in the
+  repo, so replacing the artwork is one line.
+- README documents the free-versus-unit height trade-off, the mixed 9V
+  packing, and the floor rule, and credits Lev Mishin's
+  FusionGridfinityGenerator v1.4.3.0 as the source of the bundled geometry
+  library by version. Added a section on verifying a release download by
+  SHA-256 and Authenticode signature.
+
+
 ## 1.0.8 — 2026-08-26
 
 - The installer's Finish page now names the command correctly: "find Gridfinity

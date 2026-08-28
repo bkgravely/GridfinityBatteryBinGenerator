@@ -30,7 +30,11 @@ DEFAULT_FOOT_MARGIN = 2.0     # keep the logo clear of the foot's bottom chamfer
 # --------------------------------------------------------------- fixed settings
 # The logo is deliberately not a dialog option - every bin carries it. This is
 # the only place it is configured.
-LOGO_SIZE = 28.0                    # mm across the artwork's largest dimension
+# A foot offers 35.1 mm of flat face, so 31.1 mm is the ceiling with the 2 mm
+# margin above. Sized right at it: at 28 mm the thinnest glyph in the wordmark
+# (the S) engraved a groove too narrow to survive slicing, and the letter was
+# lost on the print.
+LOGO_SIZE = 31.0                    # mm across the artwork's largest dimension
 LOGO_DEPTH = 0.4                    # mm, two 0.2 mm layers
 LOGO_PLACEMENT = PLACEMENT_CORNER   # which foot carries the mark
 # The bundled artwork is already mirrored AND rotated in its path data, so

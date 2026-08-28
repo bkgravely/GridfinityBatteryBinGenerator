@@ -16,7 +16,7 @@
 #        candle -arch x64 GridfinityBatteryBinGenerator.wxs
 #        light -ext WixUIExtension -dWixUILicenseRtf=License.rtf `
 #              GridfinityBatteryBinGenerator.wixobj `
-#              -o GridfinityBatteryBinGenerator-1.0.8-x64.msi
+#              -o GridfinityBatteryBinGenerator-1.1.0-x64.msi
 #
 #   B) WiX v4/v5 CLI (dotnet tool install --global wix):
 #        wix extension add WixToolset.UI.wixext
@@ -24,7 +24,7 @@
 #        wix build -arch x64 -ext WixToolset.UI.wixext `
 #            -d WixUILicenseRtf=License.rtf `
 #            GridfinityBatteryBinGenerator.wxs `
-#            -o GridfinityBatteryBinGenerator-1.0.8-x64.msi
+#            -o GridfinityBatteryBinGenerator-1.1.0-x64.msi
 #
 #   (On Linux, msitools builds the same source: wixl --ext ui --arch x64 ...
 #    which picks up License.rtf from the build folder automatically.)
@@ -42,13 +42,13 @@
 # OneDrive-synced folder, or the sync engine corrupts the write and signtool
 # fails with a bare error count:
 #        signtool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
-#                 /a GridfinityBatteryBinGenerator-1.0.8-x64.msi
-#        signtool verify /pa /v GridfinityBatteryBinGenerator-1.0.8-x64.msi
+#                 /a GridfinityBatteryBinGenerator-1.1.0-x64.msi
+#        signtool verify /pa /v GridfinityBatteryBinGenerator-1.1.0-x64.msi
 
 $ErrorActionPreference = 'Stop'
 python make_wxs.py --wix
 candle -arch x64 GridfinityBatteryBinGenerator.wxs
 light -ext WixUIExtension -dWixUILicenseRtf=License.rtf `
       GridfinityBatteryBinGenerator.wixobj `
-      -o GridfinityBatteryBinGenerator-1.0.8-x64.msi
-Write-Host "Built GridfinityBatteryBinGenerator-1.0.8-x64.msi"
+      -o GridfinityBatteryBinGenerator-1.1.0-x64.msi
+Write-Host "Built GridfinityBatteryBinGenerator-1.1.0-x64.msi"

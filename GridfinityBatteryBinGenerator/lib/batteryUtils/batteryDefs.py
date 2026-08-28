@@ -71,8 +71,8 @@ BATTERY_DEFAULTS = {
         slotDiaLen=27.4,   # slot length (long side of the rectangle)
         slotWidth=17.5,    # slot width (short side of the rectangle)
         slotDepth=34.0,    # nudged from 32 for 0.5 mm margin at max cell length
-        tipDiaLen=14.0,    # tip recess length (covers both snap terminals)
-        tipWidth=8.0,      # tip recess width
+        tipDiaLen=21.0,    # tip recess length (covers both snap terminals)
+        tipWidth=9.0,      # tip recess width - measured, not nominal
         tipDepth=4.0,
         ledgeDrop=15.0,
         batteryLength=48.5,
@@ -84,5 +84,18 @@ DEFAULT_MIN_SLOT_SPACING = 3.0   # minimum distance between slot walls
 DEFAULT_MIN_WALL_CLEARANCE = 5.0 # minimum distance between a slot and the inner bin wall
 DEFAULT_LEDGE_FILLET_RADIUS = 3.0  # fillet where the ledge meets the wall above it
 DEFAULT_HEADROOM = 0.5           # extra clearance wanted between battery top and wall top
-DEFAULT_BASE_DIP_ALLOWANCE = 0.5 # how far a cut may extend below the bin body into the
-                                 # solid base studs before auto-height adds another unit
+# Solid floor left under the deepest cut. The cut must never reach the
+# underside of the bin body: the feet cover only part of that face, so a
+# recess dipping below it breaks straight through wherever it lands over the
+# gap between two feet. 1.0 mm matches the compartment floor thickness the
+# gridfinity library itself uses.
+DEFAULT_MIN_FLOOR_THICKNESS = 1.0
+# Print layer height. When the bin height is NOT constrained to gridfinity
+# units, the computed height is rounded up to a whole number of these so the
+# top face lands on a layer boundary instead of part way through one. Set to 0
+# to use the exact computed height.
+DEFAULT_LAYER_HEIGHT = 0.2
+# Rectangular slots (9V) only: let the generator fill the strip left over by a
+# uniform grid with a row turned 90 degrees. Off, every slot faces the same
+# way - fewer batteries, but a tidier bin.
+DEFAULT_ALLOW_MIXED_LAYOUT = True

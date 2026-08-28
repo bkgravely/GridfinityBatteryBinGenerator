@@ -17,7 +17,7 @@ import xml.sax.saxutils as sx
 BUNDLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GridfinityBatteryBinGenerator')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GridfinityBatteryBinGenerator.wxs')
 
-VERSION = '1.0.8'
+VERSION = '1.1.0'
 
 # Emit WiX-Toolset-only elements (Windows builds). wixl rejects <WixVariable>
 # and finds License.rtf / the dialog bitmaps by filename instead, so this is

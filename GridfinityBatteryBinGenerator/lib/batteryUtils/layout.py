@@ -94,37 +94,93 @@ def computeRoundLayout(floorW, floorL, dia, spacing, wallClear):
     return _centered(floorW, floorL, best[1], best[0], best[2])
 
 
-def computeRectLayout(floorW, floorL, slotL, slotW, spacing, wallClear):
-    """Best grid of slotL x slotW rectangles (tries both orientations).
+def _rectGrid(availW, availL, sx, sy, spacing):
+    """Pack sx-by-sy rectangles into an availW x availL area, corner-anchored.
 
-    Returns dict(count, centers, desc, slotX, slotY) where slotX/slotY are
-    the chosen slot footprint along x/y, or None if nothing fits.
+    Returns dict(count, centers, usedW, usedL, nx, ny) or None if none fit.
+    Centers are measured from the corner of the available area.
     """
+    if availW < sx - EPS or availL < sy - EPS:
+        return None
+    px, py = sx + spacing, sy + spacing
+    nx = int((availW - sx + EPS) // px) + 1
+    ny = int((availL - sy + EPS) // py) + 1
+    return {
+        'count': nx * ny,
+        'centers': [(i * px + sx / 2.0, j * py + sy / 2.0)
+                    for j in range(ny) for i in range(nx)],
+        'usedW': nx * sx + (nx - 1) * spacing,
+        'usedL': ny * sy + (ny - 1) * spacing,
+        'nx': nx, 'ny': ny,
+    }
+
+
+def computeRectLayout(floorW, floorL, slotL, slotW, spacing, wallClear,
+                      allowMixed=True):
+    """Best packing of slotL x slotW rectangles on the floor area.
+
+    Tries the slot both ways round and, with `allowMixed`, mixed layouts too:
+    a main block in one orientation plus a leftover strip in the other, along
+    the side or the top. A 9V slot is far from square, so the offcut left by a
+    uniform grid is often wide enough for a row turned the other way - a 3x3
+    bin fits 18 that way against 15 uniform.
+
+    With `allowMixed` off, every slot in the bin faces the same way: fewer
+    batteries, but a tidier bin that is easier to load without looking.
+
+    Returns dict(count, centers, slotSizes, desc) with slotSizes parallel to
+    centers as (width, length) per slot, or None if nothing fits.
+    """
+    availW = floorW - 2.0 * wallClear
+    availL = floorL - 2.0 * wallClear
     best = None
-    for (sx, sy, rotated) in ((slotL, slotW, False), (slotW, slotL, True)):
-        availW = floorW - 2.0 * wallClear - sx
-        availL = floorL - 2.0 * wallClear - sy
-        if availW < -EPS or availL < -EPS:
+
+    def consider(slots, desc):
+        nonlocal best
+        if slots and (best is None or len(slots) > len(best[0])):
+            best = (slots, desc)
+
+    for (sx, sy, tag) in ((slotL, slotW, 'flat'), (slotW, slotL, 'upright')):
+        main = _rectGrid(availW, availL, sx, sy, spacing)
+        if main is None:
             continue
-        availW = max(availW, 0.0)
-        availL = max(availL, 0.0)
-        px = sx + spacing
-        py = sy + spacing
-        nx = int((availW + EPS) // px) + 1
-        ny = int((availL + EPS) // py) + 1
-        count = nx * ny
-        if count <= 0:
+        mainSlots = [(cx, cy, sx, sy) for (cx, cy) in main['centers']]
+        consider(mainSlots, '{} {}x{}'.format(tag, main['nx'], main['ny']))
+        if not allowMixed:
             continue
-        centers = [(i * px, j * py) for j in range(ny) for i in range(nx)]
-        desc = 'grid {}x{}{}'.format(nx, ny, ' (rotated 90\N{DEGREE SIGN})' if rotated else '')
-        if best is None or count > best[0]:
-            best = (count, centers, desc, sx, sy)
+
+        # the same rectangles turned 90 degrees, for whatever space is left over
+        ox, oy = sy, sx
+        side = _rectGrid(availW - main['usedW'] - spacing, availL, ox, oy, spacing)
+        if side:
+            offset = main['usedW'] + spacing
+            consider(mainSlots + [(cx + offset, cy, ox, oy) for (cx, cy) in side['centers']],
+                     '{} {}x{} plus {} turned along the side'.format(
+                         tag, main['nx'], main['ny'], side['count']))
+        top = _rectGrid(availW, availL - main['usedL'] - spacing, ox, oy, spacing)
+        if top:
+            offset = main['usedL'] + spacing
+            consider(mainSlots + [(cx, cy + offset, ox, oy) for (cx, cy) in top['centers']],
+                     '{} {}x{} plus {} turned along the end'.format(
+                         tag, main['nx'], main['ny'], top['count']))
+
     if best is None:
         return None
-    result = _centered(floorW, floorL, best[1], best[0], best[2])
-    result['slotX'] = best[3]
-    result['slotY'] = best[4]
-    return result
+
+    slots, desc = best
+    # centre the whole arrangement, mixed orientations included, on the floor
+    minX = min(x - w / 2.0 for (x, y, w, l) in slots)
+    maxX = max(x + w / 2.0 for (x, y, w, l) in slots)
+    minY = min(y - l / 2.0 for (x, y, w, l) in slots)
+    maxY = max(y + l / 2.0 for (x, y, w, l) in slots)
+    dx = floorW / 2.0 - (minX + maxX) / 2.0
+    dy = floorL / 2.0 - (minY + maxY) / 2.0
+    return {
+        'count': len(slots),
+        'centers': [(x + dx, y + dy) for (x, y, w, l) in slots],
+        'slotSizes': [(w, l) for (x, y, w, l) in slots],
+        'desc': desc,
+    }
 
 
 def bodyTopHeight(heightUnits, heightUnitMm=7.0, baseHeightMm=5.0):
@@ -135,13 +191,66 @@ def bodyTopHeight(heightUnits, heightUnitMm=7.0, baseHeightMm=5.0):
     return (heightUnits - 1) * heightUnitMm + max(0.0, heightUnitMm - baseHeightMm)
 
 
-def autoMinHeightUnits(ledgeDrop, slotDepth, tipDepth, baseDipAllowance=0.5,
+def minWallTop(ledgeDrop, slotDepth, tipDepth, minFloor=1.0):
+    """Exact wall-top height the cuts require, in mm and not rounded up to a
+    height unit. Only the floor rule constrains it: the stackability check
+    depends on ledge drop and slot depth, which move with the wall top."""
+    return ledgeDrop + slotDepth + tipDepth + minFloor
+
+
+def unitsForWallTop(wallTop, heightUnitMm=7.0, baseHeightMm=5.0):
+    """Height in gridfinity units - fractional is fine - giving that wall top.
+
+    Gridfinity only fixes the 42 mm footprint; height is free. The bin body
+    generator takes a unit count as a real number, so a bin can be exactly as
+    tall as its contents need rather than rounded up to the next 7 mm.
+    """
+    lipUnderBase = max(0.0, heightUnitMm - baseHeightMm)
+    return (wallTop - lipUnderBase) / heightUnitMm + 1.0
+
+
+def totalHeight(units, heightUnitMm=7.0, baseHeightMm=5.0):
+    """Overall printed height of the bin, base included."""
+    return bodyTopHeight(units, heightUnitMm, baseHeightMm) + baseHeightMm
+
+
+def unitsForTotalHeight(total, heightUnitMm=7.0, baseHeightMm=5.0):
+    """Inverse of totalHeight: unit count (fractional) for an overall height."""
+    return unitsForWallTop(total - baseHeightMm, heightUnitMm, baseHeightMm)
+
+
+def snapUp(value, step):
+    """Round `value` up to the next whole multiple of `step`.
+
+    Used to land the top of a free-height bin on a layer boundary: a bin that
+    is 54.5 mm tall printed at 0.2 mm layers ends mid-layer, and the slicer
+    either drops the last layer or squashes it. A step of 0 (or None) leaves
+    the value alone.
+    """
+    if not step or step <= EPS:
+        return value
+    return math.ceil(value / step - EPS) * step
+
+
+def isMultipleOf(value, step):
+    """True if `value` is a whole number of `step`s (within tolerance)."""
+    if not step or step <= EPS:
+        return True
+    return abs(value / step - round(value / step)) < 1e-6
+
+
+def autoMinHeightUnits(ledgeDrop, slotDepth, tipDepth, minFloor=1.0,
                        heightUnitMm=7.0, baseHeightMm=5.0):
-    """Smallest whole number of gridfinity height units such that the deepest
-    cut (slot + tip recess, measured `ledgeDrop + slotDepth + tipDepth` below
-    the wall top) stays inside the bin body, allowing it to dip at most
-    `baseDipAllowance` below the body bottom into the solid base studs."""
-    deepestCut = ledgeDrop + slotDepth + tipDepth - baseDipAllowance
+    """Smallest whole number of gridfinity height units that still leaves a
+    solid floor of at least `minFloor` beneath the deepest cut.
+
+    The cut must not reach the underside of the bin body at all. The feet
+    cover only part of that face, so anything dipping below it breaks clean
+    through wherever a slot lands over the gap between two feet - and the
+    slot grid is centred on the bin, not aligned to the 42 mm foot pitch, so
+    which slots line up with a gap is pure chance.
+    """
+    deepestCut = ledgeDrop + slotDepth + tipDepth + minFloor
     lipUnderBase = max(0.0, heightUnitMm - baseHeightMm)
     # wallTop(u) = (u - 1) * heightUnitMm + lipUnderBase  >=  deepestCut
     u = math.ceil((deepestCut - lipUnderBase) / heightUnitMm - EPS) + 1
@@ -160,9 +269,12 @@ def fitCheck(heightUnits, ledgeDrop, slotDepth, tipDepth, batteryLength,
                     because the ledge is measured as a drop from the wall
                     top; the fix for a negative margin is a deeper slot or
                     bigger ledge drop.
-      baseDip       how far the deepest cut (tip recess bottom) extends
-                    below the bin body into the base studs (0 if it stays
-                    inside the body). Fixed by adding height units.
+      floorThickness
+                    solid material left under the deepest cut, measured to
+                    the underside of the bin body. Must stay positive: the
+                    feet do not cover that whole face, so anything at or
+                    below zero breaks through between them. Fixed by adding
+                    height units.
       wallTop, ledgeZ, slotBottomZ, recessBottomZ, batteryTop
                     heights above the bin body bottom (top of base studs).
     """
@@ -179,7 +291,7 @@ def fitCheck(heightUnits, ledgeDrop, slotDepth, tipDepth, batteryLength,
         'recessBottomZ': recessBottomZ,
         'batteryTop': batteryTop,
         'margin': margin,
-        'baseDip': max(0.0, -recessBottomZ),
+        'floorThickness': recessBottomZ,
         'neededExtraDrop': max(0.0, -margin),
     }
 

@@ -154,8 +154,9 @@ if os.path.exists(logoPath):
     # SVG parser here, assert the shape of the file instead.
     check('bundled logo has paths', text.count('<path') >= 1, text.count('<path'))
     check('bundled logo declares a viewBox', 'viewBox' in text)
-    check('bundled logo records that it is pre-oriented',
-          'pre-oriented' in text, text[:400])
+    check('bundled logo records how it was baked',
+          'bake_logo.py' in text and 'mirrored' in text and 'rotated' in text,
+          text[:400])
     check('bundled logo has no live text', '<text' not in text)
     # orientation is baked into the path data, so no runtime transform is needed
     check('bundled logo needs no runtime transform',

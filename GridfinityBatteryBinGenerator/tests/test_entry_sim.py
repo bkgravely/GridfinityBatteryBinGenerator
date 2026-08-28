@@ -58,7 +58,13 @@ def mmInput(mm):
     return SimpleNamespace(value=mm / 10.0, isVisible=True, isEnabled=True)
 
 
-def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8):
+def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8,
+               constrainUnits=True, heightMm=56.0, layerHeight=None,
+               allowMixed=None):
+    if layerHeight is None:
+        layerHeight = defsMod.DEFAULT_LAYER_HEIGHT
+    if allowMixed is None:
+        allowMixed = defsMod.DEFAULT_ALLOW_MIXED_LAYOUT
     e = entry
     d = defsMod.BATTERY_DEFAULTS[battery]
     items = {
@@ -66,7 +72,10 @@ def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8):
         e.BIN_WIDTH_ID: SimpleNamespace(value=binX),
         e.BIN_LENGTH_ID: SimpleNamespace(value=binY),
         e.AUTO_HEIGHT_ID: SimpleNamespace(value=autoHeight),
-        e.BIN_HEIGHT_ID: SimpleNamespace(value=units, isEnabled=True),
+        e.BIN_HEIGHT_ID: SimpleNamespace(value=units, isEnabled=True, isVisible=True),
+        e.BIN_HEIGHT_MM_ID: SimpleNamespace(value=heightMm/10.0, isEnabled=True, isVisible=True),
+        e.CONSTRAIN_UNITS_ID: SimpleNamespace(value=constrainUnits),
+        e.LAYER_HEIGHT_ID: mmInput(layerHeight),
         e.SLOT_DIA_LEN_ID: mmInput(d['slotDiaLen']),
         e.SLOT_WIDTH_ID: mmInput(d['slotWidth']),
         e.SLOT_DEPTH_ID: mmInput(d['slotDepth']),
@@ -79,7 +88,8 @@ def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8):
         e.WALL_CLEARANCE_ID: mmInput(5.0),
         e.LEDGE_FILLET_ID: mmInput(3.0),
         e.HEADROOM_ID: mmInput(0.5),
-        e.BASE_DIP_ID: mmInput(0.5),
+        e.MIN_FLOOR_ID: mmInput(1.0),
+        e.MIXED_LAYOUT_ID: SimpleNamespace(value=allowMixed),
         e.WITH_LIP_ID: SimpleNamespace(value=True),
         e.LIP_NOTCHES_ID: SimpleNamespace(value=False),
         e.WALL_THICKNESS_ID: mmInput(2.15),
@@ -98,8 +108,8 @@ def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8):
     return FakeInputs(items)
 
 
-expectedAuto = {'AAA': 8, 'AA': 9, 'CR123': 6, '9V': 9, '18650': 11}
-expectedCount2x3 = {'AAA': 41, 'AA': 25, 'CR123': 20, '9V': 10, '18650': 15}
+expectedAuto = {'AAA': 8, 'AA': 9, 'CR123': 7, '9V': 9, '18650': 11}
+expectedCount2x3 = {'AAA': 41, 'AA': 25, 'CR123': 20, '9V': 11, '18650': 15}
 
 for bat in defsMod.BATTERY_TYPES:
     inputs = makeInputs(battery=bat)
@@ -119,8 +129,8 @@ for bat in defsMod.BATTERY_TYPES:
 # manual height too short -> warning about base studs
 inputs = makeInputs(battery='AA', autoHeight=False, units=8)
 p = entry.readParams(inputs)
-check('AA manual 8u warns about base', any('base studs' in w for w in p['warnings']),
-      p['warnings'])
+check('AA manual 8u warns about breaking through',
+      any('break through' in w or 'floor left' in w for w in p['warnings']), p['warnings'])
 
 # battery too long for containment -> stackability warning
 inputs = makeInputs(battery='AA')
@@ -196,7 +206,7 @@ check('dropdown change applies CR123 slot dia',
       inputs.itemById(entry.SLOT_DIA_LEN_ID).value * 10)
 p = entry.readParams(inputs)
 check('CR123 after switch: 20 slots', p['layout']['count'] == 20, p['layout'])
-check('CR123 after switch: 6 u', p['units'] == 6, p['units'])
+check('CR123 after switch: 7 u', p['units'] == 7, p['units'])
 check('CR123 after switch validates', fireValidate(inputs) is True)
 
 inputs.items[entry.BATTERY_TYPE_ID].selectedItem.name = '9V'
@@ -205,8 +215,126 @@ check('9V after switch: slot width 17.5',
       abs(inputs.itemById(entry.SLOT_WIDTH_ID).value * 10 - 17.5) < 1e-9)
 check('9V after switch validates (OK not greyed)', fireValidate(inputs) is True)
 p = entry.readParams(inputs)
-check('9V after switch: 10 slots', p['layout']['count'] == 10, p['layout'])
+check('9V after switch: 11 slots', p['layout']['count'] == 11, p['layout'])
 
+
+# ---- mixed slot orientations: on by default, and optional
+check('mixed layout defaults on', defsMod.DEFAULT_ALLOW_MIXED_LAYOUT is True)
+for (bx, by, mixedCount, uniformCount) in ((2, 3, 11, 10), (3, 3, 18, 15), (3, 4, 26, 25)):
+    on = entry.readParams(makeInputs(battery='9V', binX=bx, binY=by, allowMixed=True))
+    off = entry.readParams(makeInputs(battery='9V', binX=bx, binY=by, allowMixed=False))
+    check('9V {}x{} mixed count'.format(bx, by), on['layout']['count'] == mixedCount,
+          (on['layout']['count'], on['layout']['desc']))
+    check('9V {}x{} uniform count'.format(bx, by), off['layout']['count'] == uniformCount,
+          (off['layout']['count'], off['layout']['desc']))
+    # every slot the same way round when it is off
+    check('9V {}x{} uniform has one footprint'.format(bx, by),
+          len(set(off['layout']['slotSizes'])) == 1, set(off['layout']['slotSizes']))
+    check('9V {}x{} mixed uses both footprints'.format(bx, by),
+          len(set(on['layout']['slotSizes'])) == 2, set(on['layout']['slotSizes']))
+    # and the readout says what turning it off costs
+    check('9V {}x{} readout names the gain'.format(bx, by),
+          '{} more'.format(mixedCount - uniformCount) in entry.formatResultText(off),
+          entry.formatResultText(off))
+    check('9V {}x{} readout silent when mixed is on'.format(bx, by),
+          'more would fit' not in entry.formatResultText(on))
+
+# round batteries are unaffected either way
+for bat in ('AAA', 'AA', 'CR123', '18650'):
+    on = entry.readParams(makeInputs(battery=bat, allowMixed=True))
+    off = entry.readParams(makeInputs(battery=bat, allowMixed=False))
+    check(bat + ' ignores the mixed setting',
+          on['layout']['count'] == off['layout']['count'], (on['layout'], off['layout']))
+    check(bat + ' readout silent about mixed orientations',
+          'more would fit' not in entry.formatResultText(off))
+
+
+# ---- height: gridfinity units are optional, only the footprint is fixed
+# exact minimum heights, with the layer rounding switched off
+expectedRawMm = {'AAA': 53.5, 'AA': 59.5, 'CR123': 43.5, '9V': 59.0, '18650': 74.5}
+for bat, expected in expectedRawMm.items():
+    p = entry.readParams(makeInputs(battery=bat, constrainUnits=False, layerHeight=0.0))
+    check(bat + ' exact free height', abs(p['totalHeightMm'] - expected) < 1e-6,
+          (p['totalHeightMm'], expected))
+
+# ...and the same heights rounded up to a whole 0.2 mm layer, which is what
+# the dialog offers by default
+expectedFreeMm = {'AAA': 53.6, 'AA': 59.6, 'CR123': 43.6, '9V': 59.0, '18650': 74.6}
+for bat, expected in expectedFreeMm.items():
+    p = entry.readParams(makeInputs(battery=bat, constrainUnits=False))
+    check(bat + ' free height', abs(p['totalHeightMm'] - expected) < 1e-6,
+          (p['totalHeightMm'], expected))
+    # a free-height bin must still keep its floor and stay stackable
+    check(bat + ' free height keeps floor',
+          p['fit']['floorThickness'] >= 1.0 - 1e-6, p['fit']['floorThickness'])
+    check(bat + ' free height stackable', p['fit']['margin'] >= -1e-6, p['fit']['margin'])
+    check(bat + ' free height no errors', p['errors'] == [], p['errors'])
+    # and never be taller than the unit-rounded one
+    q = entry.readParams(makeInputs(battery=bat, constrainUnits=True))
+    check(bat + ' free height is not taller',
+          p['totalHeightMm'] <= q['totalHeightMm'] + 1e-9,
+          (p['totalHeightMm'], q['totalHeightMm']))
+
+# CR123 is the case that motivated this: a whole unit of dead plastic
+free = entry.readParams(makeInputs(battery='CR123', constrainUnits=False))
+unit = entry.readParams(makeInputs(battery='CR123', constrainUnits=True))
+check('CR123 saves 5.4mm unconstrained',
+      abs((unit['totalHeightMm'] - free['totalHeightMm']) - 5.4) < 1e-6,
+      (unit['totalHeightMm'], free['totalHeightMm']))
+check('constrained result mentions the shorter option',
+      'shorter' in entry.formatResultText(unit), entry.formatResultText(unit))
+
+# ---- layer rounding: a free height must land on a whole layer boundary
+for bat in defsMod.BATTERY_TYPES:
+    for layer in (0.2, 0.15, 0.28):
+        p = entry.readParams(makeInputs(battery=bat, constrainUnits=False, layerHeight=layer))
+        q = entry.readParams(makeInputs(battery=bat, constrainUnits=False, layerHeight=0.0))
+        check('{} height is a whole {}mm layer'.format(bat, layer),
+              layoutMod.isMultipleOf(p['totalHeightMm'], layer), p['totalHeightMm'])
+        # rounding is always UP, and never by more than one layer
+        check('{} layer rounding adds under one {}mm layer'.format(bat, layer),
+              -1e-9 <= p['totalHeightMm'] - q['totalHeightMm'] < layer - 1e-9,
+              (p['totalHeightMm'], q['totalHeightMm']))
+        # taller cannot cost floor or stackability
+        check('{} layered height keeps floor'.format(bat),
+              p['fit']['floorThickness'] >= 1.0 - 1e-6, p['fit']['floorThickness'])
+        check('{} layered height stackable'.format(bat), p['fit']['margin'] >= -1e-6)
+
+# the rounding only applies off the unit grid, and only when auto height drives it
+p = entry.readParams(makeInputs(battery='AA', constrainUnits=True))
+check('constrained height ignores the layer step',
+      abs(p['totalHeightMm'] - 63.0) < 1e-6, p['totalHeightMm'])
+check('layer note shown only off the unit grid',
+      'layer' not in entry.formatResultText(p), entry.formatResultText(p))
+check('layer note shown for a free height',
+      'layer' in entry.formatResultText(entry.readParams(
+          makeInputs(battery='AA', constrainUnits=False))))
+
+# a manual height part way through a layer is honoured, but flagged
+p = entry.readParams(makeInputs(battery='AA', autoHeight=False, constrainUnits=False,
+                                heightMm=59.55))
+check('manual off-layer height honoured', abs(p['totalHeightMm'] - 59.55) < 1e-6,
+      p['totalHeightMm'])
+check('manual off-layer height warns',
+      any('layers' in w for w in p['warnings']), p['warnings'])
+p = entry.readParams(makeInputs(battery='AA', autoHeight=False, constrainUnits=False,
+                                heightMm=59.6))
+check('manual on-layer height does not warn',
+      not any('layers' in w for w in p['warnings']), p['warnings'])
+
+# constrained mode still yields whole units
+for bat in defsMod.BATTERY_TYPES:
+    p = entry.readParams(makeInputs(battery=bat, constrainUnits=True))
+    check(bat + ' constrained height is whole units',
+          abs(p['units'] - round(p['units'])) < 1e-9, p['units'])
+
+# a manual free height is honoured, and a silly one is rejected
+p = entry.readParams(makeInputs(battery='AA', autoHeight=False,
+                                constrainUnits=False, heightMm=70.0))
+check('manual free height honoured', abs(p['totalHeightMm'] - 70.0) < 1e-6, p['totalHeightMm'])
+p = entry.readParams(makeInputs(battery='AA', autoHeight=False,
+                                constrainUnits=False, heightMm=4.0))
+check('height below the base errors', any('at least' in e for e in p['errors']), p['errors'])
 
 # ---- the name users actually see in Solid > Create
 check('command is named for the menu', entry.CMD_NAME == 'Gridfinity Battery Bin', entry.CMD_NAME)

@@ -75,8 +75,37 @@ for bat in ['AAA', 'AA', 'CR123', '18650']:
             check(name + ' fits', res is not None and res['count'] >= 1, res)
             verifyLayout(name, res, fw, fl, d['slotDiaLen'], 3.0, 5.0)
 
-print('--- 9V rect layouts ---')
+print('--- 9V rect layouts (mixed orientations allowed) ---')
 d = batteryDefs.BATTERY_DEFAULTS['9V']
+
+
+def verifyRect(name, res, floorW, floorL, spacing, wallClear):
+    """Every slot inside the floor with clearance, and no two slots closer
+    than `spacing`. Works for mixed orientations, where each slot has its
+    own footprint."""
+    slots = list(zip(res['centers'], res['slotSizes']))
+    for ((x, y), (w, l)) in slots:
+        check(name + ' inside floor',
+              x - w/2 >= wallClear - 1e-6 and floorW - x - w/2 >= wallClear - 1e-6
+              and y - l/2 >= wallClear - 1e-6 and floorL - y - l/2 >= wallClear - 1e-6,
+              (x, y, w, l))
+    for i in range(len(slots)):
+        (xi, yi), (wi, li) = slots[i]
+        for j in range(i + 1, len(slots)):
+            (xj, yj), (wj, lj) = slots[j]
+            gapX = abs(xi - xj) - (wi + wj) / 2.0
+            gapY = abs(yi - yj) - (li + lj) / 2.0
+            check(name + ' slots kept apart', max(gapX, gapY) >= spacing - 1e-6,
+                  (i, j, gapX, gapY))
+    xs = [x for ((x, y), s) in slots]; ys = [y for ((x, y), s) in slots]
+    lo = min(x - w/2 for ((x, y), (w, l)) in slots)
+    hi = max(x + w/2 for ((x, y), (w, l)) in slots)
+    check(name + ' centred in x', abs(lo - (floorW - hi)) < 1e-6, (lo, floorW - hi))
+    check(name + ' count matches slots', res['count'] == len(slots))
+    check(name + ' sizes parallel to centres',
+          len(res['centers']) == len(res['slotSizes']))
+
+
 for bx in range(1, 6):
     for by in range(1, 6):
         fw, fl = floorDims(bx, by)
@@ -88,7 +117,57 @@ for bx in range(1, 6):
             continue
         check(name + ' fits', res is not None and res['count'] >= 1, res)
         if res:
-            verifyLayout(name, res, fw, fl, res['slotX'], 3.0, 5.0, res['slotY'])
+            verifyRect(name, res, fw, fl, 3.0, 5.0)
+
+# mixed packing must never do worse than the best uniform grid, and should
+# beat it where the offcut is wide enough to turn a row sideways
+expectedMixed = {(2, 3): 11, (3, 3): 18, (3, 4): 26, (2, 2): 6, (4, 4): 35}
+for (bx, by), expected in expectedMixed.items():
+    fw, fl = floorDims(bx, by)
+    res = layout.computeRectLayout(fw, fl, d['slotDiaLen'], d['slotWidth'], 3.0, 5.0)
+    check('9V {}x{} packs {}'.format(bx, by, expected), res['count'] == expected,
+          (res['count'], res['desc']))
+
+# a mixed result really does use both orientations
+res = layout.computeRectLayout(*floorDims(3, 3), d['slotDiaLen'], d['slotWidth'], 3.0, 5.0)
+orientations = set(res['slotSizes'])
+check('3x3 mixes two orientations', len(orientations) == 2, orientations)
+print('9V 3x3: {} slots :: {}'.format(res['count'], res['desc']))
+
+# a square slot can never benefit from turning, so it must stay uniform
+sq = layout.computeRectLayout(*floorDims(3, 3), 20.0, 20.0, 3.0, 5.0)
+check('square slots stay uniform', len(set(sq['slotSizes'])) == 1, set(sq['slotSizes']))
+
+print('--- uniform grids (mixed orientations switched off) ---')
+# 4x4 is the case where a plain grid already fills the floor, so mixing wins
+# nothing and the two settings agree
+expectedUniform = {(2, 2): 6, (2, 3): 10, (3, 3): 15, (3, 4): 25, (4, 4): 35}
+for bx in range(1, 6):
+    for by in range(1, 6):
+        fw, fl = floorDims(bx, by)
+        res = layout.computeRectLayout(fw, fl, d['slotDiaLen'], d['slotWidth'],
+                                       3.0, 5.0, False)
+        mixed = layout.computeRectLayout(fw, fl, d['slotDiaLen'], d['slotWidth'],
+                                         3.0, 5.0, True)
+        name = '9V {}x{} uniform'.format(bx, by)
+        if (bx, by) == (1, 1):
+            check(name + ' correctly reports no fit', res is None, res)
+            continue
+        check(name + ' fits', res is not None and res['count'] >= 1, res)
+        verifyRect(name, res, fw, fl, 3.0, 5.0)
+        # one footprint for the whole bin, and never more than the mixed result
+        check(name + ' uses a single orientation',
+              len(set(res['slotSizes'])) == 1, set(res['slotSizes']))
+        check(name + ' never beats mixed', res['count'] <= mixed['count'],
+              (res['count'], mixed['count']))
+        if (bx, by) in expectedUniform:
+            check('{} packs {}'.format(name, expectedUniform[(bx, by)]),
+                  res['count'] == expectedUniform[(bx, by)], (res['count'], res['desc']))
+
+# round layouts have no orientation to mix, so the flag must not reach them
+check('uniform desc names a plain grid',
+      'plus' not in layout.computeRectLayout(*floorDims(3, 3), d['slotDiaLen'],
+                                             d['slotWidth'], 3.0, 5.0, False)['desc'])
 
 print('--- hex beats or ties square for AA 2x3 ---')
 fw, fl = floorDims(2, 3)
@@ -104,26 +183,65 @@ res = layout.computeRoundLayout(24.75, 24.75, 14.75, 3.0, 5.0)
 check('exactly one fits', res is not None and res['count'] == 1, res)
 
 print('--- auto height + fit checks with default tables ---')
-expectedU = {'AAA': 8, 'AA': 9, 'CR123': 6, '9V': 9, '18650': 11}
+expectedU = {'AAA': 8, 'AA': 9, 'CR123': 7, '9V': 9, '18650': 11}
 for bat in batteryDefs.BATTERY_TYPES:
     d = batteryDefs.BATTERY_DEFAULTS[bat]
     u = layout.autoMinHeightUnits(d['ledgeDrop'], d['slotDepth'], d['tipDepth'],
-                                  batteryDefs.DEFAULT_BASE_DIP_ALLOWANCE)
+                                  batteryDefs.DEFAULT_MIN_FLOOR_THICKNESS)
     fc = layout.fitCheck(u, d['ledgeDrop'], d['slotDepth'], d['tipDepth'],
                          d['batteryLength'], batteryDefs.DEFAULT_HEADROOM)
     print('{:6s} u={:2d} ({}mm total) wallTop={:5.1f} ledgeZ={:5.1f} '
           'slotBottom={:5.1f} recessBottom={:5.1f} batteryTop={:5.1f} '
-          'margin={:+.2f} baseDip={:.2f}'.format(
+          'margin={:+.2f} floor={:.2f}'.format(
               bat, u, u * 7, fc['wallTop'], fc['ledgeZ'], fc['slotBottomZ'],
-              fc['recessBottomZ'], fc['batteryTop'], fc['margin'], fc['baseDip']))
+              fc['recessBottomZ'], fc['batteryTop'], fc['margin'],
+              fc['floorThickness']))
     check(bat + ' auto units', u == expectedU[bat], u)
     check(bat + ' stackable', fc['margin'] >= -1e-6, fc)
-    check(bat + ' dip within allowance',
-          fc['baseDip'] <= batteryDefs.DEFAULT_BASE_DIP_ALLOWANCE + 1e-6, fc)
+    # nothing may reach the underside of the body: the feet leave gaps there
+    check(bat + ' keeps a solid floor',
+          fc['floorThickness'] >= batteryDefs.DEFAULT_MIN_FLOOR_THICKNESS - 1e-6, fc)
+    check(bat + ' never breaks through the bottom', fc['recessBottomZ'] > 0, fc)
     # one more unit never hurts, one fewer must violate the dip allowance
     fcLess = layout.fitCheck(u - 1, d['ledgeDrop'], d['slotDepth'], d['tipDepth'],
                              d['batteryLength'], batteryDefs.DEFAULT_HEADROOM)
-    check(bat + ' minimality', fcLess['baseDip'] > batteryDefs.DEFAULT_BASE_DIP_ALLOWANCE, fcLess)
+    check(bat + ' minimality',
+          fcLess['floorThickness'] < batteryDefs.DEFAULT_MIN_FLOOR_THICKNESS, fcLess)
+
+print('--- layer rounding ---')
+check('snapUp rounds up', abs(layout.snapUp(43.5, 0.2) - 43.6) < 1e-9, layout.snapUp(43.5, 0.2))
+check('snapUp leaves an exact multiple alone',
+      abs(layout.snapUp(59.0, 0.2) - 59.0) < 1e-9, layout.snapUp(59.0, 0.2))
+check('snapUp with no step is a no-op', layout.snapUp(43.5, 0) == 43.5)
+check('snapUp handles float dust',
+      abs(layout.snapUp(0.1 + 0.2, 0.1) - 0.3) < 1e-9, layout.snapUp(0.1 + 0.2, 0.1))
+check('isMultipleOf true', layout.isMultipleOf(59.0, 0.2))
+check('isMultipleOf false', not layout.isMultipleOf(59.5, 0.2))
+check('isMultipleOf with no step is vacuously true', layout.isMultipleOf(59.5, 0))
+
+for bat in batteryDefs.BATTERY_TYPES:
+    d = batteryDefs.BATTERY_DEFAULTS[bat]
+    exact = layout.totalHeight(layout.unitsForWallTop(layout.minWallTop(
+        d['ledgeDrop'], d['slotDepth'], d['tipDepth'],
+        batteryDefs.DEFAULT_MIN_FLOOR_THICKNESS)))
+    for layer in (0.1, 0.15, 0.2, 0.25, 0.28, 0.3):
+        snapped = layout.snapUp(exact, layer)
+        u = layout.unitsForTotalHeight(snapped)
+        # the round trip through unit counts must not lose the layer boundary
+        check('{} {}mm layer round trip'.format(bat, layer),
+              abs(layout.totalHeight(u) - snapped) < 1e-9,
+              (layout.totalHeight(u), snapped))
+        check('{} {}mm layer is a whole layer'.format(bat, layer),
+              layout.isMultipleOf(layout.totalHeight(u), layer), layout.totalHeight(u))
+        check('{} {}mm layer only ever adds height'.format(bat, layer),
+              -1e-9 <= snapped - exact < layer, (snapped, exact))
+        # the extra height goes into the walls, so the floor can only get thicker
+        fc = layout.fitCheck(u, d['ledgeDrop'], d['slotDepth'], d['tipDepth'],
+                             d['batteryLength'], batteryDefs.DEFAULT_HEADROOM)
+        check('{} {}mm layer keeps the floor'.format(bat, layer),
+              fc['floorThickness'] >= batteryDefs.DEFAULT_MIN_FLOOR_THICKNESS - 1e-6,
+              fc['floorThickness'])
+        check('{} {}mm layer stays stackable'.format(bat, layer), fc['margin'] >= -1e-6)
 
 print('--- counts summary (defaults, wall 2.15) ---')
 for bat in batteryDefs.BATTERY_TYPES:
