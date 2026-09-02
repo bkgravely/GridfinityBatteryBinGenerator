@@ -98,6 +98,12 @@ mid-layer, but it won't override you.
 
 ### Label tab
 
+![AA bin with a corner chemistry shelf reading ALK](docs/images/label-tab.png)
+
+*The lettering is coloured in that render to make it legible. A generated bin is
+a single solid body — the text is joined into it — so a printed one comes out in
+one colour.*
+
 Off by default. Turn on **Chemistry label tab** and a small triangular shelf
 appears across one corner of the ledge, carrying a two- or three-letter code —
 ALK, LI, NMH, ION, RCH, ZNC, or your own up to three characters via *Other*.
@@ -158,7 +164,7 @@ the command's `entry.py` to get separate letter bodies back.
 
 ### Logo
 
-![Redwood Craftworks logo engraved into the corner foot of a bin](docs/images/logo-foot.png)
+![Redwood Craftworks monogram engraved into the corner foot of a bin](docs/images/logo-foot.png)
 
 Every bin is engraved with the logo at
 `GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/logo.svg`,
