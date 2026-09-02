@@ -3,7 +3,7 @@
     AutodeskProduct="Fusion360"
     Name="GridfinityBatteryBinGenerator"
     Description="Generates gridfinity bins with a maximized grid of tip-down battery storage slots (AAA, AA, CR123, 9V, 18650). Built on the GridfinityGenerator add-in library by Lev Mishin (CC BY-NC-SA 4.0)."
-    AppVersion="1.1.0"
+    AppVersion="1.1.1"
     ProductType="Application"
     Author="Bryan Gravely"
     ProductCode="{f7d4ed4f-bd47-4a78-8884-467624e8ca0d}"
@@ -11,6 +11,6 @@
   <CompanyDetails Name="Bryan Gravely" Email="bryan@gravlaxy.com" />
   <Components>
     <RuntimeRequirements OS="Win64|MacOS" Platform="Fusion360" />
-    <ComponentEntry AppName="GridfinityBatteryBinGenerator" Version="1.1.0" ModuleName="./Contents/GridfinityBatteryBinGenerator/GridfinityBatteryBinGenerator.py" />
+    <ComponentEntry AppName="GridfinityBatteryBinGenerator" Version="1.1.1" ModuleName="./Contents/GridfinityBatteryBinGenerator/GridfinityBatteryBinGenerator.py" />
   </Components>
 </ApplicationPackage>

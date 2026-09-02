@@ -17,7 +17,7 @@ import xml.sax.saxutils as sx
 BUNDLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GridfinityBatteryBinGenerator')
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'GridfinityBatteryBinGenerator.wxs')
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 
 # Emit WiX-Toolset-only elements (Windows builds). wixl rejects <WixVariable>
 # and finds License.rtf / the dialog bitmaps by filename instead, so this is
@@ -45,6 +45,20 @@ def commandName(fallback='Gridfinity Battery Bin'):
 
 COMMAND_NAME = commandName()
 EXIT_TEXT = 'Restart Autodesk Fusion, then find {} under Solid - Create.'.format(COMMAND_NAME)
+
+# No authored uninstall dialogs here, and that is deliberate.
+#
+# A confirmation before removal and a closing page after it were built, on the
+# branded panel, correctly conditioned and sequenced - verified by reading the
+# Dialog, ControlCondition and InstallUISequence tables straight out of the
+# built MSI. They never appeared. Add/Remove Programs does not run an MSI
+# uninstall at a UI level that shows authored dialogs; it puts up its own
+# confirmation and its own progress, and the package has no say in it. The UI
+# level belongs to whoever launches msiexec, so nothing in here can change it.
+# WixUI_Minimal not shipping maintenance dialogs turns out to be the same
+# conclusion reached earlier by someone else.
+#
+# Anything added here would be code that reads like a feature and does nothing.
 
 UI_VARIABLES = ''
 if USE_WIX_VARIABLES:
@@ -99,8 +113,14 @@ def emitDir(fsPath, relPath, indent):
     return lines
 
 
+KEEP_AUTODESK_GUID = str(uuid.uuid5(NAMESPACE, 'keepdir/pf64/Autodesk')).upper()
+KEEP_APPPLUGINS_GUID = str(uuid.uuid5(NAMESPACE, 'keepdir/pf64/Autodesk/ApplicationPlugins')).upper()
+
 body = emitDir(BUNDLE, '', 7)
 compRefs = '\n'.join('            <ComponentRef Id="{}"/>'.format(i) for i in sorted(ids) if i.startswith('cmp'))
+# the two folder-keeping components are not discovered by walking the payload
+compRefs = ('            <ComponentRef Id="cmpKeepAutodesk"/>\n'
+            '            <ComponentRef Id="cmpKeepAppPlugins"/>\n') + compRefs
 
 wxs = '''<?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
@@ -132,7 +152,26 @@ wxs = '''<?xml version="1.0" encoding="utf-8"?>
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFiles64Folder">
                 <Directory Id="dirAutodesk" Name="Autodesk">
+                    <!-- Autodesk\ApplicationPlugins is shared ground: every
+                         Fusion add-in installed this way lives in it. Windows
+                         Installer removes any directory it created once the
+                         last thing in it goes, so uninstalling this add-in
+                         would take both of these with it whenever ours was the
+                         only plugin present - and the next installer, or
+                         Autodesk itself, would find the path gone.
+
+                         A permanent component holding the folder is the
+                         documented way to stop that: it is installed and never
+                         uninstalled, so the folder it owns stays put. Only
+                         GridfinityBatteryBinGenerator below is ours to
+                         remove. -->
+                    <Component Id="cmpKeepAutodesk" Guid="{{{keepAutodesk}}}" Permanent="yes">
+                        <CreateFolder/>
+                    </Component>
                     <Directory Id="dirAppPlugins" Name="ApplicationPlugins">
+                        <Component Id="cmpKeepAppPlugins" Guid="{{{keepAppPlugins}}}" Permanent="yes">
+                            <CreateFolder/>
+                        </Component>
                         <Directory Id="dirBundle" Name="GridfinityBatteryBinGenerator">
 {body}
                         </Directory>
@@ -147,6 +186,7 @@ wxs = '''<?xml version="1.0" encoding="utf-8"?>
 </Wix>
 '''.format(name=PRODUCT_NAME, version=VERSION, manufacturer=MANUFACTURER,
            uiVariables=UI_VARIABLES, exitText=EXIT_TEXT,
+           keepAutodesk=KEEP_AUTODESK_GUID, keepAppPlugins=KEEP_APPPLUGINS_GUID,
            upgrade=UPGRADE_CODE, body='\n'.join(body), comprefs=compRefs)
 
 with open(OUT, 'w') as f:

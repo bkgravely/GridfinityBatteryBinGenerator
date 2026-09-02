@@ -3,11 +3,11 @@
     <Product Id="*"
              Name="GridfinityBatteryBinGenerator for Autodesk Fusion"
              Language="1033"
-             Version="1.1.0"
+             Version="1.1.1"
              Manufacturer="Bryan Gravely"
              UpgradeCode="{6f2a8f10-9c53-4b7e-8d21-b7a4f0c2d9a1}">
         <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
-                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.1.0"
+                 Description="GridfinityBatteryBinGenerator for Autodesk Fusion 1.1.1"
                  Manufacturer="Bryan Gravely"/>
         <MediaTemplate EmbedCab="yes"/>
         <!-- WixUI_Minimal: licence page, progress, and a Finish page that
@@ -28,7 +28,26 @@
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFiles64Folder">
                 <Directory Id="dirAutodesk" Name="Autodesk">
+                    <!-- Autodesk\ApplicationPlugins is shared ground: every
+                         Fusion add-in installed this way lives in it. Windows
+                         Installer removes any directory it created once the
+                         last thing in it goes, so uninstalling this add-in
+                         would take both of these with it whenever ours was the
+                         only plugin present - and the next installer, or
+                         Autodesk itself, would find the path gone.
+
+                         A permanent component holding the folder is the
+                         documented way to stop that: it is installed and never
+                         uninstalled, so the folder it owns stays put. Only
+                         GridfinityBatteryBinGenerator below is ours to
+                         remove. -->
+                    <Component Id="cmpKeepAutodesk" Guid="{FAD7465D-5C2B-5372-B73C-7CDCF74EFFD2}" Permanent="yes">
+                        <CreateFolder/>
+                    </Component>
                     <Directory Id="dirAppPlugins" Name="ApplicationPlugins">
+                        <Component Id="cmpKeepAppPlugins" Guid="{7057B146-5DC2-531D-9D4B-BC23BDED9F75}" Permanent="yes">
+                            <CreateFolder/>
+                        </Component>
                         <Directory Id="dirBundle" Name="GridfinityBatteryBinGenerator">
                             <Component Id="cmp_ATTRIBUTION_md" Guid="{F213ED47-3FF6-5089-B56C-FFEB00829D16}">
                                 <File Id="fil_ATTRIBUTION_md" Name="ATTRIBUTION.md" Source="GridfinityBatteryBinGenerator/ATTRIBUTION.md" KeyPath="yes"/>
@@ -190,6 +209,8 @@
             </Directory>
         </Directory>
         <Feature Id="MainFeature" Title="GridfinityBatteryBinGenerator for Autodesk Fusion" Level="1">
+            <ComponentRef Id="cmpKeepAutodesk"/>
+            <ComponentRef Id="cmpKeepAppPlugins"/>
             <ComponentRef Id="cmp_ATTRIBUTION_md"/>
             <ComponentRef Id="cmp_GridfinityBatteryBinGenerator_manifest"/>
             <ComponentRef Id="cmp_GridfinityBatteryBinGenerator_py"/>

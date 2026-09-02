@@ -31,11 +31,34 @@ DEFAULT_FOOT_MARGIN = 2.0     # keep the logo clear of the foot's bottom chamfer
 # The logo is deliberately not a dialog option - every bin carries it. This is
 # the only place it is configured.
 # A foot offers 35.1 mm of flat face, so 31.1 mm is the ceiling with the 2 mm
-# margin above. Sized right at it: at 28 mm the thinnest glyph in the wordmark
-# (the S) engraved a groove too narrow to survive slicing, and the letter was
-# lost on the print.
+# margin above, and the mark is sized right at it. That started as a fix - at
+# 28 mm the thinnest glyph in the old wordmark, the S, engraved a groove too
+# narrow to survive slicing and was lost on the print - and it stays because a
+# mark on the base of a bin is read at arm's length in a drawer.
+#
+# The artwork is portrait, so this is its height; the width follows the aspect
+# ratio and comes out around 19 mm, well inside the same face.
 LOGO_SIZE = 31.0                    # mm across the artwork's largest dimension
-LOGO_DEPTH = 0.4                    # mm, two 0.2 mm layers
+
+# How deep the mark is cut, mm. Keep it a whole number of print layers, or the
+# floor lands mid-layer and comes out ragged: 0.8 is four 0.2 mm layers.
+#
+# Deeper is not just darker. The bin prints logo-down, so the recess is a void
+# and its floor is a layer printed across open air - it keeps the round profile
+# of each extrusion instead of being squashed flat by the plate like the face
+# around it, and no amount of slicer tuning makes an air-printed surface glassy.
+# (Ironing cannot help either; it only works on upward-facing surfaces.) What
+# depth changes is how much of that texture you see: at 0.4 mm the floor is
+# close enough to the surface to catch the light, at 0.8 mm it sits in shadow.
+# Bridge span is set by the width of the strokes, not the depth, so going
+# deeper costs nothing structurally - the foot is millimetres thick. 0.4, 0.6
+# and 0.8 were printed side by side; 0.8 is the one where the floor stops
+# reading as texture and the mark reads as a cut.
+#
+# Going shallower is the risky direction. At 0.2 mm only the first layer is
+# voided, and first-layer squish spreads material into the narrow parts of the
+# mark - which is what swallowed the S on the old wordmark.
+LOGO_DEPTH = 0.8
 LOGO_PLACEMENT = PLACEMENT_CORNER   # which foot carries the mark
 # The bundled artwork is already mirrored AND rotated in its path data, so
 # no runtime transform is needed. These apply to artwork swapped in later.
@@ -107,11 +130,55 @@ def _boxArea(box):
     return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
 
 
+def keepByLoopNesting(profileLoops):
+    """Indices of the regions to cut, from each region's loop identities.
+
+    This is the same parity rule, but the nesting comes from the modeller's
+    own topology rather than from bounding boxes. A region with a hole in it
+    carries that hole as an inner loop, and the region filling the hole has
+    the very same curves as its outer loop. So if a region's outer loop is
+    some other region's inner loop, it sits one level deeper, and following
+    that chain gives an exact nesting depth. Odd depths are holes.
+
+    Bounding boxes cannot do this. In a mark where one shape reaches across
+    another - a tree standing between an R and a C - the tree's box contains
+    the counter of the R without the tree containing any of it, and that
+    phantom level flips the counter from hole to cut. Which is how the middle
+    of the R came to be engraved solid.
+
+    `profileLoops` is one (outerKey, innerKeys) pair per region, where a key
+    identifies a loop's curves and is equal for two loops made of the same
+    ones.
+    """
+    innerOwner = {}
+    for index, (_outer, inners) in enumerate(profileLoops):
+        for key in inners:
+            innerOwner.setdefault(key, index)
+    keep = []
+    for index, (outer, _inners) in enumerate(profileLoops):
+        depth = 0
+        current = outer
+        seen = set()
+        # walk outwards: this region's outer loop is its parent's inner loop
+        while current in innerOwner and current not in seen:
+            seen.add(current)
+            depth += 1
+            current = profileLoops[innerOwner[current]][0]
+        if depth % 2 == 0:
+            keep.append(index)
+    return keep
+
+
 def keepByNestingParity(boxes, tol=1e-6):
     """Indices of the regions to cut, given each region's bounding box.
 
     A region nested inside an odd number of others is a hole and is skipped;
     everything else is engraved. Boxes are (minX, minY, maxX, maxY).
+
+    Fallback only, for artwork whose loops cannot be identified: a bounding
+    box says nothing about whether one shape really contains another, so this
+    misreads any mark whose shapes reach across each other. Prefer
+    keepByLoopNesting.
     """
     keep = []
     for i, box in enumerate(boxes):

@@ -77,6 +77,34 @@ check('sibling shapes both kept', L.keepByNestingParity([a, b]) == [0, 1])
 check('single shape kept', L.keepByNestingParity([a]) == [0])
 check('no shapes', L.keepByNestingParity([]) == [])
 
+# And the same rule read off the loops instead, which is what actually runs.
+# A region carries its holes as inner loops, and the region filling a hole has
+# that hole's curves as its own outer loop.
+#                        (outer,     inners)
+O = [('ringOutline', ('counter',)), ('counter', ())]
+check('loops: O keeps only the ring', L.keepByLoopNesting(O) == [0])
+withIsland = [('ringOutline', ('counter',)), ('counter', ('island',)), ('island', ())]
+check('loops: island inside a counter is engraved',
+      L.keepByLoopNesting(withIsland) == [0, 2])
+check('loops: siblings both kept',
+      L.keepByLoopNesting([('a', ()), ('b', ())]) == [0, 1])
+check('loops: no shapes', L.keepByLoopNesting([]) == [])
+
+# The regression this rule exists for. In the R / redwood / C monogram the
+# tree's bounding box swallows the counter of the R while containing none of
+# it, and that phantom level of nesting flipped the counter from hole to cut -
+# the middle of the R engraved solid. Boxes taken from the shipped artwork.
+rOuter    = (-359.91,  84.75, -228.10, 216.25)
+rCounter  = (-277.05, 153.51, -242.63, 197.92)
+tree      = (-297.80,  17.99,   -0.01, 197.96)
+check('boxes alone get the monogram wrong (why the rule changed)',
+      L.keepByNestingParity([rOuter, rCounter, tree]) == [0, 1, 2],
+      L.keepByNestingParity([rOuter, rCounter, tree]))
+monogram = [('rOutline', ('rCounter',)), ('rCounter', ()), ('treeOutline', ())]
+check('loops keep the middle of the R open',
+      L.keepByLoopNesting(monogram) == [0, 2],
+      L.keepByLoopNesting(monogram))
+
 print('--- svg transform wrapping ---')
 plain = '<?xml version="1.0"?>\n<svg viewBox="0 0 10 10"><path d="M0,0 L1,1"/></svg>'
 check('no transform returns original', L.wrapSvgTransform(plain, False, 0) is plain)

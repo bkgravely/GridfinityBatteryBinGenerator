@@ -22,6 +22,14 @@ def check(name, cond, detail=''):
         print('FAIL: {} {}'.format(name, detail))
 
 
+def _raises(call, exc=ValueError):
+    try:
+        call()
+    except exc:
+        return True
+    return False
+
+
 def floorDims(binX, binY, wallMm=2.15, xyClear=0.25, baseUnit=42.0):
     w = baseUnit * binX - 2 * xyClear - 2 * wallMm
     l = baseUnit * binY - 2 * xyClear - 2 * wallMm
@@ -207,6 +215,261 @@ for bat in batteryDefs.BATTERY_TYPES:
                              d['batteryLength'], batteryDefs.DEFAULT_HEADROOM)
     check(bat + ' minimality',
           fcLess['floorThickness'] < batteryDefs.DEFAULT_MIN_FLOOR_THICKNESS, fcLess)
+
+print('--- corner label tab ---')
+check('two letters need a smaller shelf',
+      layout.tabLegForText('LI', 2.8, 0.7) < layout.tabLegForText('ALK', 2.8, 0.7))
+# character widths, not character counts: I is a third the width of W, so
+# which letters are in the code moves the shelf as much as how many
+check('a narrow three-letter code beats a wide two-letter one',
+      layout.tabLegForText('III', 5.0, 0.6) < layout.tabLegForText('WW', 5.0, 0.6),
+      (layout.tabLegForText('III', 5.0, 0.6), layout.tabLegForText('WW', 5.0, 0.6)))
+check('an unknown character is sized as the widest there is',
+      abs(layout.textWidthRatio(chr(0x2022)) - layout.CHAR_WIDTH_FALLBACK) < 1e-9)
+# measured against the font itself: "ALK" at 7.5 mm is 22.4 mm wide, not the
+# 15.3 mm a flat 0.68 average gave - the error that ran the K into the wall
+check('ALK at 7.5 mm measures 22.4 mm wide',
+      abs(layout.tabTextWidth('ALK', 7.5) - 22.41) < 0.05,
+      layout.tabTextWidth('ALK', 7.5))
+check('leg and text height invert each other',
+      abs(layout.tabTextHeightForLeg(layout.tabLegForText('ALK', 2.8, 0.7), 'ALK', 0.7)
+          - 2.8) < 1e-9)
+check('unknown corner is rejected',
+      _raises(lambda: layout.tabTriangle(80.0, 100.0, 10.0, 'middle')))
+for corner, expected in (('Back left', [(0.0, 100.0), (10.0, 100.0), (0.0, 90.0)]),
+                         ('Back right', [(80.0, 100.0), (70.0, 100.0), (80.0, 90.0)]),
+                         ('Front left', [(0.0, 0.0), (10.0, 0.0), (0.0, 10.0)]),
+                         ('Front right', [(80.0, 0.0), (70.0, 0.0), (80.0, 10.0)])):
+    check('triangle on the ' + corner,
+          layout.tabTriangle(80.0, 100.0, 10.0, corner) == expected,
+          layout.tabTriangle(80.0, 100.0, 10.0, corner))
+
+# the guarantee: a corner triangle within twice the wall clearance cannot
+# reach a slot, whatever the battery, bin size or corner
+for clearance in (4.0, 5.0, 6.0):
+    freeLeg = layout.freeTabLeg(clearance)
+    for bat in batteryDefs.BATTERY_TYPES:
+        d = batteryDefs.BATTERY_DEFAULTS[bat]
+        for (bx, by) in [(1, 1), (1, 2), (2, 2), (2, 3), (3, 3), (3, 4), (4, 5), (5, 5)]:
+            fw, fl = floorDims(bx, by)
+            if d['isRound']:
+                res = layout.computeRoundLayout(fw, fl, d['slotDiaLen'], 3.0, clearance)
+            else:
+                res = layout.computeRectLayout(fw, fl, d['slotDiaLen'], d['slotWidth'],
+                                               3.0, clearance)
+            if res is None or freeLeg >= min(fw, fl):
+                continue
+            for corner in layout.TAB_CORNERS:
+                tri = layout.tabTriangle(fw, fl, freeLeg, corner)
+                trimmed = layout.removeSlotsUnderTab(res, tri)
+                check('{} {}x{} {} shelf at clearance {} is free'.format(
+                          bat, bx, by, corner, clearance),
+                      trimmed is not None and trimmed['blocked'] == 0,
+                      trimmed and trimmed['blocked'])
+                check('{} {}x{} {} keeps every slot'.format(bat, bx, by, corner),
+                      trimmed['count'] == res['count'])
+                check('{} {}x{} {} slots do not move'.format(bat, bx, by, corner),
+                      trimmed['centers'] == res['centers'])
+
+# and one deliberately oversized shelf must be caught rather than ignored
+fw, fl = floorDims(2, 3)
+d = batteryDefs.BATTERY_DEFAULTS['AA']
+res = layout.computeRoundLayout(fw, fl, d['slotDiaLen'], 3.0, 5.0)
+big = layout.removeSlotsUnderTab(res, layout.tabTriangle(fw, fl, 22.0, 'Back left'))
+check('an oversized shelf does cover slots', big['blocked'] > 0, big['blocked'])
+check('oversized shelf count matches', big['count'] == res['count'] - big['blocked'])
+check('nothing left under an oversized shelf',
+      layout.slotsUnder(big, layout.tabTriangle(fw, fl, 22.0, 'Back left')) == [])
+
+# the lettering has to sit inside the triangle it was sized for: the baseline
+# runs parallel to the hypotenuse, and the text band reaches inwards from it
+for corner in layout.TAB_CORNERS:
+    leg = layout.tabLegForText('ALK', 2.8, 0.7)
+    tri = layout.tabTriangle(fw, fl, leg, corner)
+    (sx, sy), (ex, ey) = layout.tabTextBaseline(fw, fl, leg, 0.7, corner)
+    cornerPt = tri[0]
+    midX = (tri[1][0] + tri[2][0]) / 2.0
+    midY = (tri[1][1] + tri[2][1]) / 2.0
+    inX, inY = cornerPt[0] - midX, cornerPt[1] - midY
+    inLen = math.hypot(inX, inY)
+    inX, inY = inX / inLen, inY / inLen
+    ux, uy = ex - sx, ey - sy
+    check(corner + ' baseline is parallel to the hypotenuse',
+          abs(ux * (tri[2][1] - tri[1][1]) - uy * (tri[2][0] - tri[1][0])) < 1e-9)
+    check(corner + ' text falls towards the corner',
+          ux * inY - uy * inX > 0, (ux, uy, inX, inY))
+    # the lettering is centred on the baseline: check its four corners, not
+    # the ends of the line, because the triangle narrows between them
+    runLen = math.hypot(ux, uy)
+    dirX, dirY = ux / runLen, uy / runLen
+    midBaseX, midBaseY = (sx + ex) / 2.0, (sy + ey) / 2.0
+    halfText = layout.tabTextWidth('ALK', 2.8) / 2.0
+    band = []
+    for along in (-halfText, halfText):
+        for deep in (0.0, 2.8):
+            band.append((midBaseX + dirX * along + inX * deep,
+                         midBaseY + dirY * along + inY * deep))
+    check(corner + ' lettering stays inside the triangle',
+          all(abs(px - cornerPt[0]) + abs(py - cornerPt[1]) <= leg + 1e-6
+              for (px, py) in band), band)
+    check(corner + ' lettering is inside the floor',
+          all(-1e-6 <= px <= fw + 1e-6 and -1e-6 <= py <= fl + 1e-6
+              for (px, py) in band), band)
+    check(corner + ' baseline is long enough for the text',
+          math.hypot(ux, uy) >= layout.tabTextWidth('ALK', 2.8) - 1e-9,
+          (math.hypot(ux, uy), layout.tabTextWidth('ALK', 2.8)))
+
+# The check above measures the text band against the hypotenuse. That is not
+# where the lettering escaped: with the width underestimated, the ends of the
+# text ran out past the LEGS, which are buried in the bin walls, and the last
+# letter surfaced inside the wall. Sum-of-distances hides that - a point past a
+# leg still sums to less than the leg length - so resolve the band into the
+# triangle's own axes and check all three edges separately, for every code in
+# the table, at the height that actually ships.
+for (_chem, code) in batteryDefs.CHEMISTRY_LABELS:
+    if not code:
+        continue
+    height = batteryDefs.DEFAULT_TAB_TEXT_HEIGHT
+    margin = batteryDefs.DEFAULT_TAB_MARGIN
+    leg = layout.tabLegForText(code, height, margin)
+    for corner in layout.TAB_CORNERS:
+        cornerPt, legA, legB = layout.tabTriangle(fw, fl, leg, corner)
+        axisA = ((legA[0] - cornerPt[0]) / leg, (legA[1] - cornerPt[1]) / leg)
+        axisB = ((legB[0] - cornerPt[0]) / leg, (legB[1] - cornerPt[1]) / leg)
+        (sx, sy), (ex, ey) = layout.tabTextBaseline(fw, fl, leg, margin, corner)
+        midX = (legA[0] + legB[0]) / 2.0
+        midY = (legA[1] + legB[1]) / 2.0
+        inX, inY = cornerPt[0] - midX, cornerPt[1] - midY
+        inLen = math.hypot(inX, inY)
+        inX, inY = inX / inLen, inY / inLen
+        ux, uy = ex - sx, ey - sy
+        runLen = math.hypot(ux, uy)
+        dirX, dirY = ux / runLen, uy / runLen
+        midBaseX, midBaseY = (sx + ex) / 2.0, (sy + ey) / 2.0
+        half = layout.tabTextWidth(code, height) / 2.0
+        insideWalls = insideHyp = True
+        for along in (-half, half):
+            for deep in (0.0, height):
+                px = midBaseX + dirX * along + inX * deep - cornerPt[0]
+                py = midBaseY + dirY * along + inY * deep - cornerPt[1]
+                a = px * axisA[0] + py * axisA[1]
+                b = px * axisB[0] + py * axisB[1]
+                insideWalls = insideWalls and a >= -1e-9 and b >= -1e-9
+                insideHyp = insideHyp and a + b <= leg + 1e-9
+        check('{} in the {} corner clears both walls'.format(code, corner.lower()),
+              insideWalls)
+        check('{} in the {} corner clears the hypotenuse'.format(code, corner.lower()),
+              insideHyp)
+
+# and the estimate the shelf is cut from has to match the font it is set in
+check('ALK at 7.5 mm is 22.4 mm of Arial Bold, not 15.3',
+      abs(layout.tabTextWidth('ALK', 7.5) - 22.41) < 0.05,
+      layout.tabTextWidth('ALK', 7.5))
+
+print('--- lettering stroke width ---')
+# raised text prints as walls, so a stem thinner than the extrusion width is
+# not thinned, it is discarded - and the label vanishes with no warning
+check('stem scales with height',
+      abs(layout.tabStemWidth(2.8) - 2.8 * layout.STEM_RATIO) < 1e-9)
+check('the default height clears a 0.4 mm nozzle',
+      layout.tabStemWidth(batteryDefs.DEFAULT_TAB_TEXT_HEIGHT)
+      >= batteryDefs.MIN_PRINTABLE_STROKE,
+      layout.tabStemWidth(batteryDefs.DEFAULT_TAB_TEXT_HEIGHT))
+check('half that height does not', layout.tabStemWidth(1.4) < batteryDefs.MIN_PRINTABLE_STROKE)
+# the default is sized for legibility, not for costing nothing
+check('the default lettering is well clear of the nozzle limit',
+      layout.tabStemWidth(batteryDefs.DEFAULT_TAB_TEXT_HEIGHT)
+      > 2 * batteryDefs.MIN_PRINTABLE_STROKE,
+      layout.tabStemWidth(batteryDefs.DEFAULT_TAB_TEXT_HEIGHT))
+
+print('--- the one-slot shelf size ---')
+# 18 mm is the largest corner shelf that never costs more than a single slot,
+# and never the last one. This is measured, so it is asserted rather than
+# trusted: exhaustively at the limit, and shown to break just past it.
+def shelfCost(leg):
+    worstBlocked = 0
+    emptied = False
+    for bat in batteryDefs.BATTERY_TYPES:
+        d = batteryDefs.BATTERY_DEFAULTS[bat]
+        for bx in range(1, 6):
+            for by in range(1, 6):
+                if (bx, by) == (1, 1):
+                    continue  # a one-battery bin is not a thing anyone prints
+                fw, fl = floorDims(bx, by)
+                if d['isRound']:
+                    res = layout.computeRoundLayout(fw, fl, d['slotDiaLen'], 3.0, 5.0)
+                else:
+                    res = layout.computeRectLayout(fw, fl, d['slotDiaLen'],
+                                                   d['slotWidth'], 3.0, 5.0)
+                if res is None or leg >= min(fw, fl):
+                    continue
+                for corner in layout.TAB_CORNERS:
+                    trimmed = layout.removeSlotsUnderTab(
+                        res, layout.tabTriangle(fw, fl, leg, corner))
+                    if trimmed is None or trimmed['count'] < 1:
+                        emptied = True
+                        continue
+                    worstBlocked = max(worstBlocked, trimmed['blocked'])
+    return worstBlocked, emptied
+
+blocked, emptied = shelfCost(batteryDefs.ONE_SLOT_TAB_LEG)
+print('an {} mm shelf costs at most {} slot(s)'.format(batteryDefs.ONE_SLOT_TAB_LEG, blocked))
+check('the one-slot shelf costs at most one slot', blocked <= 1, blocked)
+check('the one-slot shelf never empties a bin', not emptied)
+overBlocked, overEmptied = shelfCost(batteryDefs.ONE_SLOT_TAB_LEG + 0.5)
+check('half a millimetre more does empty one', overEmptied or overBlocked > 1,
+      (overBlocked, overEmptied))
+
+# the shipped default has to sit inside that ceiling, and print
+defaultLeg = layout.tabLegForText('ALK', batteryDefs.DEFAULT_TAB_TEXT_HEIGHT,
+                                  batteryDefs.DEFAULT_TAB_MARGIN)
+check('the default shelf is within the one-slot size',
+      defaultLeg <= batteryDefs.ONE_SLOT_TAB_LEG, defaultLeg)
+check('the default lettering prints',
+      layout.tabStemWidth(batteryDefs.DEFAULT_TAB_TEXT_HEIGHT)
+      >= batteryDefs.MIN_PRINTABLE_STROKE)
+# every code in the table has to fit the one-slot shelf at the shipped height,
+# and the widest of them is what sets that height
+for (_name, code) in batteryDefs.CHEMISTRY_LABELS:
+    if not code:
+        continue
+    leg = layout.tabLegForText(code, batteryDefs.DEFAULT_TAB_TEXT_HEIGHT,
+                               batteryDefs.DEFAULT_TAB_MARGIN)
+    check(code + ' fits the one-slot shelf at the default height',
+          leg <= batteryDefs.ONE_SLOT_TAB_LEG, leg)
+# A free shelf - one provably too small to touch a slot - holds a two-letter
+# code at a printable size, but not a three-letter one: the widths that fixed
+# the overrun also shrank what 10 mm of leg will carry.
+freeTwo = layout.tabTextHeightForLeg(layout.freeTabLeg(5.0), 'LI',
+                                     batteryDefs.DEFAULT_TAB_MARGIN)
+check('a free shelf prints a two-letter code',
+      layout.tabStemWidth(freeTwo) >= batteryDefs.MIN_PRINTABLE_STROKE, freeTwo)
+freeThree = layout.tabTextHeightForLeg(layout.freeTabLeg(5.0), 'ALK',
+                                       batteryDefs.DEFAULT_TAB_MARGIN)
+check('a free shelf cannot print three letters, and the dialog says so',
+      layout.tabStemWidth(freeThree) < batteryDefs.MIN_PRINTABLE_STROKE, freeThree)
+
+print('--- shelf corner against the bin fillet ---')
+# the shelf overlaps the wall for a clean join, but a square corner pushed too
+# far lands outside the bin's filleted outer corner and hangs off the edge
+for (outerFillet, wall) in ((3.75, 2.15), (3.75, 1.6), (3.75, 3.0), (3.5, 2.15)):
+    limit = layout.cornerBuryLimit(outerFillet, wall)
+    inner = max(outerFillet - wall, 0.0)
+    check('bury limit {}/{} is positive'.format(outerFillet, wall), limit > 0, limit)
+    # exactly at the limit the corner touches the fillet
+    check('bury limit {}/{} touches the fillet'.format(outerFillet, wall),
+          abs(math.hypot(limit + inner, limit + inner) - outerFillet) < 1e-9)
+    # a hair beyond it, the corner is outside
+    over = limit + 0.01
+    check('past the limit {}/{} the corner is outside'.format(outerFillet, wall),
+          math.hypot(over + inner, over + inner) > outerFillet)
+
+# a thin wall leaves the corner outside however little is buried, which the
+# generator warns about rather than building silently
+check('a thin wall has no safe bury', layout.cornerBuryLimit(3.75, 0.8) < 0,
+      layout.cornerBuryLimit(3.75, 0.8))
+check('a thick wall has plenty', layout.cornerBuryLimit(3.75, 3.75) > 2.6,
+      layout.cornerBuryLimit(3.75, 3.75))
 
 print('--- layer rounding ---')
 check('snapUp rounds up', abs(layout.snapUp(43.5, 0.2) - 43.6) < 1e-9, layout.snapUp(43.5, 0.2))

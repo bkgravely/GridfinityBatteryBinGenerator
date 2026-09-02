@@ -25,6 +25,14 @@ from svgpathtools import parse_path, Path, Line, CubicBezier, QuadraticBezier, A
 ROTATION_DEG = 90
 MIRROR = True
 CLOSE_TOL = 1e-6
+# Segments shorter than this (in SVG user units) are dropped as degenerate.
+# It is not just about tidiness: Illustrator ends contours with a hairline stub
+# a hundredth of a unit long that doubles back over its neighbour, and an
+# outline that crosses itself extrudes into a non-manifold edge - which every
+# slicer then complains about. The real geometry in this artwork has nothing
+# under half a unit, so 0.05 units sits a hundred times below anything meant to
+# be there, and comfortably above the stubs and spikes that are not.
+DEGENERATE_TOL = 0.05
 
 _PATH_D = re.compile(r'(<path\b[^>]*?\bd\s*=\s*")([^"]*)(")', re.IGNORECASE | re.DOTALL)
 _VIEWBOX = re.compile(r'viewBox\s*=\s*"([^"]*)"', re.IGNORECASE)
@@ -70,23 +78,61 @@ def mapSegment(seg, width):
     raise TypeError('unhandled segment type {}'.format(type(seg)))
 
 
+def withEndpoints(seg, start=None, end=None):
+    """The same segment with one or both endpoints moved, control points kept."""
+    start = seg.start if start is None else start
+    end = seg.end if end is None else end
+    if isinstance(seg, Line):
+        return Line(start, end)
+    if isinstance(seg, CubicBezier):
+        return CubicBezier(start, seg.control1, seg.control2, end)
+    if isinstance(seg, QuadraticBezier):
+        return QuadraticBezier(start, seg.control, end)
+    return Arc(start, seg.radius, seg.rotation, seg.large_arc, seg.sweep, end)
+
+
+def trimOverlappingTail(segs):
+    """Cut a contour whose end runs back over its beginning.
+
+    Illustrator likes to close a shape by carrying the last segment past the
+    first one instead of meeting it. Snapping the endpoints together leaves
+    that overshoot in place as a crossing, which extrudes into a non-manifold
+    edge. Where the tail really does cross the head, the honest closure is at
+    the crossing itself: keep the part of the first segment after it, the part
+    of the crossing segment before it, and throw away everything past.
+    """
+    n = len(segs)
+    for j in range(n - 1, 1, -1):
+        hits = segs[0].intersect(segs[j])
+        if not hits:
+            continue
+        t0, tj = hits[0]
+        point = segs[0].point(t0)
+        head = withEndpoints(segs[0], start=point)
+        tail = withEndpoints(segs[j], end=point)
+        kept = [head] + segs[1:j] + [tail]
+        return [s for s in kept if abs(s.end - s.start) > CLOSE_TOL], n - len(kept)
+    return segs, 0
+
+
 def cleanSubpath(sub):
-    """Drop zero-length segments and snap the contour shut on its start."""
-    segs = [s for s in sub if abs(s.end - s.start) > CLOSE_TOL]
+    """Drop degenerate segments, heal the gaps that leaves, trim any tail that
+    overshoots the start, and snap the contour shut."""
+    segs = [s for s in sub if abs(s.end - s.start) > DEGENERATE_TOL]
     if not segs:
         return None, 0
     dropped = len(sub) - len(segs)
-    if abs(segs[-1].end - segs[0].start) > 0:
-        last = segs[-1]
-        if isinstance(last, Line):
-            segs[-1] = Line(last.start, segs[0].start)
-        elif isinstance(last, CubicBezier):
-            segs[-1] = CubicBezier(last.start, last.control1, last.control2, segs[0].start)
-        elif isinstance(last, QuadraticBezier):
-            segs[-1] = QuadraticBezier(last.start, last.control, segs[0].start)
-        else:
-            segs[-1] = Arc(last.start, last.radius, last.rotation,
-                           last.large_arc, last.sweep, segs[0].start)
+
+    # dropping an interior segment leaves a gap; pull the next one back onto
+    # the previous endpoint rather than emitting a discontinuous contour
+    for k in range(1, len(segs)):
+        if abs(segs[k].start - segs[k - 1].end) > CLOSE_TOL:
+            segs[k] = withEndpoints(segs[k], start=segs[k - 1].end)
+
+    segs, trimmed = trimOverlappingTail(segs)
+    dropped += trimmed
+    if abs(segs[-1].end - segs[0].start) > CLOSE_TOL:
+        segs[-1] = withEndpoints(segs[-1], end=segs[0].start)
     return Path(*segs), dropped
 
 
@@ -100,7 +146,7 @@ def bakePathData(d, width, stats):
             stats['empty'] += 1
             continue
         stats['contours'] += 1
-        out.append(cleaned.d() + ' Z')
+        out.append(cleaned.d())
     return ' '.join(out)
 
 
@@ -119,6 +165,46 @@ def _addGradientTransform(svgText, matrix):
                 'gradientTransform="{} {}"'.format(matrix, existing.group(1)), tag)
         return tag[:-1] + ' gradientTransform="{}">'.format(matrix)
     return _GRAD_OPEN.sub(fix, svgText)
+
+
+def selfIntersections(sub):
+    """Non-adjacent segment pairs of one contour that cross or touch.
+
+    A contour that crosses itself becomes a non-manifold edge once the
+    engraving is cut, and slicers refuse to stay quiet about it. Adjacent
+    segments are skipped because they legitimately share an endpoint.
+    """
+    hits = []
+    n = len(sub)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if j == i + 1 or (i == 0 and j == n - 1):
+                continue
+            for (t1, _t2) in sub[i].intersect(sub[j]):
+                hits.append((i, j, sub[i].point(t1)))
+    return hits
+
+
+def validate(svgText):
+    """Re-parse the baked file and refuse to emit geometry a slicer will flag."""
+    problems = []
+    shortest = None
+    for match in _PATH_D.finditer(svgText):
+        for sub in parse_path(match.group(2)).continuous_subpaths():
+            for seg in sub:
+                length = abs(seg.end - seg.start)
+                if shortest is None or length < shortest:
+                    shortest = length
+            if abs(sub[-1].end - sub[0].start) > CLOSE_TOL:
+                problems.append('a contour does not close on its start point')
+            for (i, j, point) in selfIntersections(sub):
+                problems.append(
+                    'a contour crosses itself: segments {} and {} meet at '
+                    '({:.3f}, {:.3f})'.format(i, j, point.real, point.imag))
+    print('shortest segment {:.4f} units'.format(shortest if shortest else 0.0))
+    if problems:
+        raise ValueError('baked artwork is not printable:\n  ' + '\n  '.join(problems))
+    print('validated: every contour closed, none self-intersecting')
 
 
 def bake(svgText):
@@ -164,9 +250,10 @@ def bake(svgText):
         '     against the source artwork instead. -->\n'.format(ROTATION_DEG))
     body = body.replace('<svg', header + '<svg', 1)
 
-    print('contours {contours}, zero-length segments dropped {dropped}, '
+    print('contours {contours}, degenerate segments dropped {dropped}, '
           'empty contours skipped {empty}'.format(**stats))
     print('viewBox', box)
+    validate(body)
     return body
 
 
@@ -176,6 +263,9 @@ if __name__ == '__main__':
         sys.exit(2)
     with open(sys.argv[1], 'r', encoding='utf-8') as handle:
         text = handle.read()
+    # bake first, write second: opening the output truncates it, so doing that
+    # before validation leaves an empty logo.svg behind on a failed run
+    baked = bake(text)
     with open(sys.argv[2], 'w', encoding='utf-8') as handle:
-        handle.write(bake(text))
+        handle.write(baked)
     print('wrote', sys.argv[2])

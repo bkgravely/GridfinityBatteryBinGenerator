@@ -99,3 +99,82 @@ DEFAULT_LAYER_HEIGHT = 0.2
 # uniform grid with a row turned 90 degrees. Off, every slot faces the same
 # way - fewer batteries, but a tidier bin.
 DEFAULT_ALLOW_MIXED_LAYOUT = True
+
+# ------------------------------------------------------------------ label tab
+# An optional shelf across one corner of the ledge, carrying a short chemistry
+# code. The battery size is deliberately not on it: you are looking down into
+# the bin to read it, so you can already see what is in there, and a shorter
+# label means a smaller shelf.
+#
+# The size is what makes it free. Every slot keeps the wall clearance from both
+# walls, so in corner coordinates a slot only occupies x >= c and y >= c, while
+# a right triangle on the corner only occupies x + y <= leg. While the leg
+# stays within twice the clearance the two cannot overlap - on any bin, for any
+# battery, in any corner. No measuring and no special cases.
+CHEMISTRY_OTHER = 'Other'
+CHEMISTRY_LABELS = [
+    ('Alkaline', 'ALK'),
+    ('Lithium', 'LI'),
+    ('NiMH', 'NMH'),
+    ('Li-ion', 'ION'),
+    ('Rechargeable', 'RCH'),
+    ('Carbon zinc', 'ZNC'),
+    (CHEMISTRY_OTHER, ''),
+]
+CHEMISTRY_NAMES = [name for (name, _code) in CHEMISTRY_LABELS]
+
+DEFAULT_TAB_ENABLED = False
+# Two sizes matter for a corner shelf.
+#
+# FREE: a triangle with legs within twice the slot-to-wall clearance - 10 mm at
+# the default - provably cannot reach a slot on any bin. But it only holds
+# about 2.9 mm text, which is small to read across a drawer.
+#
+# ONE SLOT: 24 mm is the largest shelf that never costs more than a single slot
+# on any bin from 1x2 to 5x5, for any battery, in any corner - measured across
+# the whole matrix, not derived, and asserted in the tests. Past it an AAA 2x5
+# starts losing two. 1x1 bins are excluded: an 18650 or CR123 1x1 holds a single
+# battery and nobody prints one.
+#
+# The default sits just inside that, because a label you can actually read
+# across a drawer is worth one battery out of twenty-five. Dial the height down
+# to 2.9 mm for a free shelf; the readout states the cost either way.
+ONE_SLOT_TAB_LEG = 24.0
+# 5.9 mm is the tallest lettering that keeps every code in the table inside
+# that 24 mm leg. The binding one is NMH, the widest of them at 3.31 cap
+# heights; LI would take 9.6 mm. Raise it in the dialog for a short code and
+# the readout will say what the bigger shelf costs.
+DEFAULT_TAB_TEXT_HEIGHT = 5.9     # cap height, mm
+DEFAULT_TAB_MARGIN = 0.6          # flat border around the text, mm
+DEFAULT_TAB_TEXT_DEPTH = 0.4      # raised height, two 0.2 mm layers
+DEFAULT_TAB_THICKNESS = 1.6       # shelf thickness at the corner, mm
+DEFAULT_TAB_TOP_CLEARANCE = 1.0   # tab top below the wall top, mm
+DEFAULT_TAB_CORNER = 'Back left'
+DEFAULT_TAB_FONT = 'Arial'
+# Faces whose character widths match the table the shelf is sized from.
+# Helvetica and Liberation Sans are metric-compatible with Arial by design.
+KNOWN_METRIC_FONTS = ('Arial', 'Helvetica', 'Liberation Sans')
+# Bold, and not for looks: raised lettering is printed as walls, and a regular
+# weight at this size has stems around 0.34 mm - narrower than the 0.42 mm line
+# a 0.4 mm nozzle lays down, so the slicer discards the letters entirely and the
+# label silently disappears. Bold takes the stems to about 0.53 mm.
+DEFAULT_TAB_BOLD = True
+# Thinnest stroke a common 0.4 mm nozzle will reliably print, mm.
+MIN_PRINTABLE_STROKE = 0.45
+MAX_TAB_CHARS = 3
+
+# Colour is deliberately not here yet. Assigning a second filament to the
+# lettering needs it to reach the slicer as its own part, and a body per letter
+# is exactly what Bambu loaded as four scattered objects rather than one bin.
+# Until that export path is worked out the text is joined into the bin and a
+# generated bin is a single solid - see JOIN_TEXT_TO_BIN in the command.
+
+
+def chemistryCode(name, override=''):
+    """Label text for a chemistry: the table's code, or your own for Other."""
+    if name == CHEMISTRY_OTHER:
+        return override.strip().upper()
+    for (label, code) in CHEMISTRY_LABELS:
+        if label == name:
+            return code
+    return ''

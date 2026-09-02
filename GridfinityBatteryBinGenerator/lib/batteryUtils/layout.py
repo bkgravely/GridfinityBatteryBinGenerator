@@ -12,7 +12,7 @@ import math
 EPS = 1e-6
 
 
-def _centered(floorW, floorL, centers, count, desc):
+def _centered(floorW, floorL, centers, count, desc, dia):
     """Shift a list of slot centers so the pattern bounding box is centered
     on the floor area."""
     xs = [c[0] for c in centers]
@@ -24,6 +24,9 @@ def _centered(floorW, floorL, centers, count, desc):
     return {
         'count': count,
         'centers': [(x + dx, y + dy) for (x, y) in centers],
+        # square footprints, so round and rectangular layouts can be handled
+        # by the same code downstream
+        'slotSizes': [(dia, dia)] * count,
         'desc': desc,
     }
 
@@ -91,7 +94,7 @@ def computeRoundLayout(floorW, floorL, dia, spacing, wallClear):
     best = max(candidates, key=lambda c: c[0])
     if best[0] <= 0:
         return None
-    return _centered(floorW, floorL, best[1], best[0], best[2])
+    return _centered(floorW, floorL, best[1], best[0], best[2], dia)
 
 
 def _rectGrid(availW, availL, sx, sy, spacing):
@@ -180,6 +183,206 @@ def computeRectLayout(floorW, floorL, slotL, slotW, spacing, wallClear,
         'centers': [(x + dx, y + dy) for (x, y, w, l) in slots],
         'slotSizes': [(w, l) for (x, y, w, l) in slots],
         'desc': desc,
+    }
+
+
+TAB_CORNERS = ['Back left', 'Back right', 'Front left', 'Front right']
+
+
+def cornerBuryLimit(outerFillet, wallThickness):
+    """How far a square corner may reach into the wall before it pokes out.
+
+    The bin's outer corner is filleted and the inner face of the wall is
+    concentric with it, so with the fillet centre at (r, r) - where r is the
+    inner radius - a shelf corner at (-b, -b) stays inside the bin while
+    sqrt(2) * (b + r) <= outerFillet.
+
+    A negative result means even a corner flush with the inside face of the
+    wall would stand outside the bin, which happens when the wall is thin
+    enough that the fillet has eaten the corner entirely.
+    """
+    inner = max(outerFillet - wallThickness, 0.0)
+    return outerFillet / math.sqrt(2.0) - inner
+
+
+def freeTabLeg(wallClearance):
+    """Longest corner tab that provably costs nothing.
+
+    Every slot keeps `wallClearance` from each wall, so in corner coordinates
+    a slot only ever occupies x >= c and y >= c, and a right triangle on the
+    corner only ever occupies x + y <= leg. The two cannot overlap while
+    leg <= 2c - they meet at a single point at most. No measuring, no
+    per-battery special cases: a tab within this size is free on every bin.
+    """
+    return 2.0 * wallClearance
+
+
+# Advance width of each character as a fraction of cap height, measured from
+# Liberation Sans Bold, which is metric-compatible with the Arial Bold the
+# label is set in.
+#
+# A single average will not do. The first build used 0.68 for every character,
+# which put "ALK" at 7.5 mm text 15.3 mm wide; the real figure is 22.4 mm, so
+# the triangle was sized about 7 mm too small and the last letter ran off the
+# shelf and into the bin wall. Widths across the alphabet range from 0.40 (I)
+# to 1.37 (W) - more than a factor of three - so which letters are in the code
+# matters as much as how many.
+CHAR_WIDTHS = {
+    'A': 1.050, 'B': 1.050, 'C': 1.050, 'D': 1.050, 'E': 0.969, 'F': 0.888,
+    'G': 1.131, 'H': 1.050, 'I': 0.404, 'J': 0.808, 'K': 1.050, 'L': 0.888,
+    'M': 1.211, 'N': 1.050, 'O': 1.131, 'P': 0.969, 'Q': 1.131, 'R': 1.050,
+    'S': 0.969, 'T': 0.888, 'U': 1.050, 'V': 0.969, 'W': 1.372, 'X': 0.969,
+    'Y': 0.969, 'Z': 0.888,
+    '0': 0.808, '1': 0.808, '2': 0.808, '3': 0.808, '4': 0.808,
+    '5': 0.808, '6': 0.808, '7': 0.808, '8': 0.808, '9': 0.808,
+    ' ': 0.404, '-': 0.484, '+': 0.849, '/': 0.404, '.': 0.404, '&': 1.050,
+}
+# An unlisted character, or a font with wider metrics, sizes the shelf by the
+# widest letter there is. Too big is a bigger shelf; too small is lettering
+# through the wall.
+CHAR_WIDTH_FALLBACK = 1.372
+# Width of a letter's stem as a fraction of cap height. Taken from the vertical
+# of an I; the diagonals of A, K and Z run a little thinner, so this is the
+# optimistic end and the printable-stroke check keeps a margin under it.
+STEM_RATIO = 0.135 / 0.716
+
+
+def tabStemWidth(textHeight, stemRatio=STEM_RATIO):
+    """Width of the thinnest stroke in the lettering, mm.
+
+    Raised text is printed as walls, so a stem narrower than the extrusion
+    width cannot be laid down at all - the slicer discards the letter rather
+    than thinning it, and the label disappears with no warning.
+    """
+    return textHeight * stemRatio
+
+
+def textWidthRatio(text):
+    """Width of `text` in cap heights: the sum of its characters' widths."""
+    return sum(CHAR_WIDTHS.get(ch, CHAR_WIDTH_FALLBACK) for ch in (text or ' '))
+
+
+def tabTextWidth(text, textHeight):
+    """Width of `text` set at `textHeight` cap height, mm."""
+    return textWidthRatio(text) * textHeight
+
+
+def tabLegForText(text, textHeight, margin):
+    """Leg length a corner triangle needs to hold `text` along its hypotenuse.
+
+    The text runs parallel to the long edge, which is the way a corner label
+    wants to read. The triangle narrows towards the corner, so the binding
+    constraint is the far side of the lettering: a band `margin` in from the
+    hypotenuse and `textHeight` deep leaves a chord of leg*sqrt(2) - 2*(margin
+    + textHeight), and the text plus a margin at each end has to fit in it.
+    """
+    width = tabTextWidth(text, textHeight)
+    return (width + 4.0 * margin + 2.0 * textHeight) / math.sqrt(2.0)
+
+
+def tabTextHeightForLeg(leg, text, margin):
+    """Inverse of tabLegForText: the tallest text a given leg will hold."""
+    return max((leg * math.sqrt(2.0) - 4.0 * margin) / (textWidthRatio(text) + 2.0), 0.0)
+
+
+def tabTextBaseline(floorW, floorL, leg, margin, corner):
+    """The line the lettering sits on: parallel to the hypotenuse, `margin`
+    inside it, running so that the text falls towards the corner.
+
+    Returns (start, end) in floor coordinates. Which end is the start matters:
+    Fusion lays text along the path and puts it on the left-hand side, so the
+    direction is chosen to make "left" point at the right-angle corner.
+    """
+    corner_pt, legA, legB = tabTriangle(floorW, floorL, leg, corner)
+    midX = (legA[0] + legB[0]) / 2.0
+    midY = (legA[1] + legB[1]) / 2.0
+    inX, inY = corner_pt[0] - midX, corner_pt[1] - midY
+    inLen = math.hypot(inX, inY)
+    if inLen < EPS:
+        raise ValueError('degenerate label triangle')
+    inX, inY = inX / inLen, inY / inLen
+
+    ux, uy = legA[0] - legB[0], legA[1] - legB[1]
+    runLen = math.hypot(ux, uy)
+    ux, uy = ux / runLen, uy / runLen
+    # cross(u, inward) > 0 means the corner lies to the left of the run
+    if ux * inY - uy * inX < 0:
+        ux, uy = -ux, -uy
+
+    # centre of the chord `margin` in from the hypotenuse, and half its length
+    cx = midX + inX * margin
+    cy = midY + inY * margin
+    half = (runLen - 2.0 * margin) / 2.0
+    return ((cx - ux * half, cy - uy * half), (cx + ux * half, cy + uy * half))
+
+
+def tabTriangle(floorW, floorL, leg, corner):
+    """The tab's footprint: a right triangle on one corner of the floor,
+    as three (x, y) points in floor coordinates."""
+    if corner not in TAB_CORNERS:
+        raise ValueError('unknown tab corner: {}'.format(corner))
+    x = floorW if corner.endswith('right') else 0.0
+    y = 0.0 if corner.startswith('Front') else floorL
+    dx = -leg if corner.endswith('right') else leg
+    dy = leg if corner.startswith('Front') else -leg
+    return [(x, y), (x + dx, y), (x, y + dy)]
+
+
+def _polysOverlap(a, b):
+    """Separating-axis test for two convex polygons, touching not counted."""
+    for poly in (a, b):
+        for i in range(len(poly)):
+            (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % len(poly)]
+            ax, ay = -(y1 - y0), (x1 - x0)
+            pa = [ax * px + ay * py for (px, py) in a]
+            pb = [ax * px + ay * py for (px, py) in b]
+            if max(pa) <= min(pb) + EPS or max(pb) <= min(pa) + EPS:
+                return False
+    return True
+
+
+def slotsUnder(res, tri):
+    """Indices of slots whose opening overlaps the tab.
+
+    A slot even partly under the tab is unusable: the battery has to come
+    straight up out of a close-fitting hole, so anything overhanging it blocks
+    removal entirely rather than just making it awkward.
+    """
+    blocked = []
+    for index, ((cx, cy), (sw, sl)) in enumerate(zip(res['centers'], res['slotSizes'])):
+        box = [(cx - sw / 2.0, cy - sl / 2.0), (cx + sw / 2.0, cy - sl / 2.0),
+               (cx + sw / 2.0, cy + sl / 2.0), (cx - sw / 2.0, cy + sl / 2.0)]
+        if _polysOverlap(tri, box):
+            blocked.append(index)
+    return blocked
+
+
+def removeSlotsUnderTab(res, rect):
+    """Drop the slots the tab would sit over, keeping the rest exactly where
+    they were.
+
+    The layout is not re-packed around the tab on purpose: a bin with a label
+    should hold its slots in the same places as one without, so adding or
+    removing the tab never reshuffles a design you have already printed.
+
+    Returns a new layout dict carrying `blocked`, or None if nothing is left.
+    """
+    if res is None:
+        return None
+    blocked = set(slotsUnder(res, rect))
+    if not blocked:
+        out = dict(res)
+        out['blocked'] = 0
+        return out
+    keep = [i for i in range(len(res['centers'])) if i not in blocked]
+    if not keep:
+        return None
+    return {
+        'count': len(keep),
+        'centers': [res['centers'][i] for i in keep],
+        'slotSizes': [res['slotSizes'][i] for i in keep],
+        'desc': res['desc'],
+        'blocked': len(blocked),
     }
 
 

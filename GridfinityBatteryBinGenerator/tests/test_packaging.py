@@ -168,6 +168,32 @@ else:
             check(bmpName + ' is {}x{}'.format(*expected),
                   (width, abs(height)) == expected, (width, abs(height)))
 
+    # --- shared plugin folder
+    # Autodesk\ApplicationPlugins is shared by every Fusion add-in installed
+    # this way. Windows Installer deletes a directory it created once the last
+    # thing in it goes, so without permanent components holding these two open,
+    # uninstalling took the shared folder with it whenever ours was the only
+    # plugin present.
+    check('a component holds the Autodesk folder open',
+          'Id="cmpKeepAutodesk"' in makeWxs)
+    check('a component holds the ApplicationPlugins folder open',
+          'Id="cmpKeepAppPlugins"' in makeWxs)
+    check('both folder-keepers are permanent', makeWxs.count('Permanent="yes"') == 2,
+          makeWxs.count('Permanent="yes"'))
+    check('both folder-keepers are installed',
+          makeWxs.count('<ComponentRef Id="cmpKeepAutodesk"/>') == 1
+          and makeWxs.count('<ComponentRef Id="cmpKeepAppPlugins"/>') == 1)
+    check('the add-in folder itself is still removable',
+          'Permanent' not in makeWxs.split('Id="dirBundle"')[1])
+    # wixl silently ignores Component/@Permanent, so the linux build patches the
+    # bit in afterwards and verifies it. If that step is lost, the flag in the
+    # source becomes a comment that does nothing.
+    buildLinux = read(os.path.join(INSTALLER_DIR, 'build-linux.sh'))
+    check('the linux build sets the permanent bit wixl drops',
+          'Attributes' in buildLinux and '= 272' in buildLinux)
+    check('the linux build verifies the permanent bit took',
+          '$4!=272' in buildLinux)
+
     check('linux build script present',
           os.path.isfile(os.path.join(INSTALLER_DIR, 'build-linux.sh')))
     check('make_wxs supports the WiX Toolset path', "'--wix' in sys.argv" in makeWxs)

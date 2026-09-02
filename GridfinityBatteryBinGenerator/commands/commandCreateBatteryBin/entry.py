@@ -76,6 +76,14 @@ HEADROOM_ID = 'bb_headroom'
 MIN_FLOOR_ID = 'bb_min_floor'
 MIXED_LAYOUT_ID = 'bb_mixed_layout'
 
+LABEL_GROUP_ID = 'bb_label_group'
+TAB_ENABLED_ID = 'bb_tab_enabled'
+CHEMISTRY_ID = 'bb_chemistry'
+CHEMISTRY_OTHER_ID = 'bb_chemistry_other'
+TAB_CORNER_ID = 'bb_tab_corner'
+TAB_TEXT_HEIGHT_ID = 'bb_tab_text_height'
+TAB_FONT_ID = 'bb_tab_font'
+
 WITH_LIP_ID = 'bb_with_lip'
 LIP_NOTCHES_ID = 'bb_lip_notches'
 WALL_THICKNESS_ID = 'bb_wall_thickness'
@@ -95,6 +103,20 @@ RESULT_TEXT_ID = 'bb_result_text'
 
 BUNDLED_LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  'resources', 'logo.svg')
+
+# Join the raised lettering into the bin, so a generated bin is one solid body.
+#
+# Leaving the letters as their own bodies is what a two-colour print would want:
+# a slicer assigns filament per part, so the text arriving as its own part is
+# the difference between picking it and hand-painting it. It does not survive
+# the trip, though. Fusion writes one 3MF object per body, and Bambu loads
+# those as separate objects rather than parts of one - it drops each to the
+# plate and arranges it, so a labelled bin arrives as a bin plus loose letters
+# scattered around the bed, one of them off the plate entirely. Until that
+# export path is worked out, one body is worth more than a colour option.
+#
+# Set False to get the letters back as separate bodies; nothing else changes.
+JOIN_TEXT_TO_BIN = True
 
 INFO_TEXT = ('<b>Gridfinity Battery Bin</b> — builds a Gridfinity bin '
              '(geometry from the GridfinityGenerator add-in library) and cuts a '
@@ -225,6 +247,25 @@ def readParams(inputs: adsk.core.CommandInputs):
     p['allowMixed'] = adsk.core.BoolValueCommandInput.cast(
         inputs.itemById(MIXED_LAYOUT_ID)).value
 
+    p['tabEnabled'] = adsk.core.BoolValueCommandInput.cast(
+        inputs.itemById(TAB_ENABLED_ID)).value
+    p['chemistry'] = adsk.core.DropDownCommandInput.cast(
+        inputs.itemById(CHEMISTRY_ID)).selectedItem.name
+    p['chemistryOther'] = adsk.core.StringValueCommandInput.cast(
+        inputs.itemById(CHEMISTRY_OTHER_ID)).value
+    p['tabCorner'] = adsk.core.DropDownCommandInput.cast(
+        inputs.itemById(TAB_CORNER_ID)).selectedItem.name
+    p['tabTextHeight'] = mm(TAB_TEXT_HEIGHT_ID)
+    p['tabFont'] = adsk.core.StringValueCommandInput.cast(
+        inputs.itemById(TAB_FONT_ID)).value.strip() or batteryDefs.DEFAULT_TAB_FONT
+    p['tabText'] = batteryDefs.chemistryCode(p['chemistry'], p['chemistryOther'])
+    p['tabMargin'] = batteryDefs.DEFAULT_TAB_MARGIN
+    p['tabTextDepth'] = batteryDefs.DEFAULT_TAB_TEXT_DEPTH
+    p['tabBold'] = batteryDefs.DEFAULT_TAB_BOLD
+    p['tabStem'] = layout.tabStemWidth(p['tabTextHeight'])
+    p['tabThickness'] = batteryDefs.DEFAULT_TAB_THICKNESS
+    p['tabTopClearance'] = batteryDefs.DEFAULT_TAB_TOP_CLEARANCE
+
     p['withLip'] = adsk.core.BoolValueCommandInput.cast(inputs.itemById(WITH_LIP_ID)).value
     p['lipNotches'] = adsk.core.BoolValueCommandInput.cast(inputs.itemById(LIP_NOTCHES_ID)).value
     p['wallThickness'] = mm(WALL_THICKNESS_ID)
@@ -299,6 +340,27 @@ def readParams(inputs: adsk.core.CommandInputs):
             p['floorW'], p['floorL'], p['slotDiaLen'], p['slotWidth'],
             p['minSpacing'], p['wallClearance'], p['allowMixed'])
 
+    # the label tab, and what it costs. The tab sits in a corner the wall
+    # clearance had already left empty, so it usually blocks nothing.
+    p['tabTri'] = None
+    p['tabBlocked'] = 0
+    p['tabLeg'] = 0.0
+    p['tabFreeLeg'] = layout.freeTabLeg(p['wallClearance'])
+    if p['tabEnabled'] and p['tabText'] and p['layout'] is not None:
+        leg = layout.tabLegForText(p['tabText'], p['tabTextHeight'], p['tabMargin'])
+        p['tabLeg'] = leg
+        if leg < p['floorW'] - 1e-9 and leg < p['floorL'] - 1e-9:
+            p['tabTri'] = layout.tabTriangle(p['floorW'], p['floorL'], leg, p['tabCorner'])
+            trimmed = layout.removeSlotsUnderTab(p['layout'], p['tabTri'])
+            if trimmed is None:
+                errors.append('The label tab would cover every slot in this bin.')
+            else:
+                p['tabBlocked'] = trimmed['blocked']
+                p['layout'] = trimmed
+        else:
+            errors.append('The label tab is bigger than the bin floor; use a shorter '
+                          'label or a smaller text height.')
+
     # what turning mixed orientations back on would be worth, so the choice is
     # an informed one rather than a silent loss of capacity
     p['mixedGain'] = 0
@@ -363,6 +425,53 @@ def readParams(inputs: adsk.core.CommandInputs):
                         '{:.2f} mm.'.format(p['totalHeightMm'], p['layerHeight'],
                                             layout.snapUp(p['totalHeightMm'], p['layerHeight'])))
 
+    if p['tabEnabled']:
+        if p['chemistry'] == batteryDefs.CHEMISTRY_OTHER and not p['tabText']:
+            errors.append('Enter the label text, up to {} characters.'.format(
+                batteryDefs.MAX_TAB_CHARS))
+        elif len(p['tabText']) > batteryDefs.MAX_TAB_CHARS:
+            errors.append('Label text is {} characters; the corner tab holds {}.'.format(
+                len(p['tabText']), batteryDefs.MAX_TAB_CHARS))
+        if p['tabFont'] not in batteryDefs.KNOWN_METRIC_FONTS:
+            # The shelf is sized from a table of Arial Bold character widths.
+            # Another face lays out to a different width, and the shelf is cut
+            # to fit the text, so a wider one runs off it into the bin wall.
+            warnings.append('The shelf is sized from Arial Bold letter widths; '
+                            '{} may set wider or narrower. Check the preview, '
+                            'and give the text height a millimetre or two of '
+                            'room if it runs to the edge.'.format(p['tabFont']))
+        if p['tabTextHeight'] <= 0:
+            errors.append('Label text height must be positive.')
+        elif p['tabStem'] < batteryDefs.MIN_PRINTABLE_STROKE:
+            minHeight = batteryDefs.MIN_PRINTABLE_STROKE / layout.STEM_RATIO
+            warnings.append('At {:.1f} mm the lettering has {:.2f} mm stems, thinner '
+                            'than a 0.4 mm nozzle can lay a line into - the slicer will '
+                            'drop the letters and print a blank shelf. Use {:.1f} mm or '
+                            'more.'.format(p['tabTextHeight'], p['tabStem'], minHeight))
+        # One slot is the accepted price of a readable label, so only speak up
+        # past that - or when the shelf is bigger than the size that was
+        # measured to cost at most one on every bin.
+        if p['tabBlocked'] > 1 or p['tabLeg'] > batteryDefs.ONE_SLOT_TAB_LEG:
+            warnings.append('The label shelf is {:.1f} mm and covers {} slot{}. Up to '
+                            '{:.1f} mm it never costs more than one on any bin, and '
+                            'below {:.1f} mm it costs none at all. Text of {:.1f} mm '
+                            'holds it to one slot.'.format(
+                                p['tabLeg'], p['tabBlocked'],
+                                '' if p['tabBlocked'] == 1 else 's',
+                                batteryDefs.ONE_SLOT_TAB_LEG, p['tabFreeLeg'],
+                                layout.tabTextHeightForLeg(
+                                    batteryDefs.ONE_SLOT_TAB_LEG, p['tabText'],
+                                    p['tabMargin'])))
+        if layout.cornerBuryLimit(labelOuterFillet(p), p['wallThickness']) <= 0:
+            warnings.append('The wall is thin enough that the bin\'s corner fillet has '
+                            'eaten the corner, so the label shelf may stand slightly '
+                            'proud of the outside there. A wall of about {:.1f} mm or '
+                            'more avoids it.'.format(
+                                labelOuterFillet(p) * (1.0 - 1.0 / math.sqrt(2.0))))
+        if p['tabThickness'] + p['tabTopClearance'] > p['ledgeDrop']:
+            warnings.append('The label shelf is thicker than the ledge drop leaves room '
+                            'for; increase the ledge drop.')
+
     if not os.path.isfile(p['logoPath']):
         errors.append('The bundled logo is missing from the add-in (expected '
                       'resources/logo.svg); reinstall the add-in to restore it.')
@@ -383,6 +492,14 @@ def formatResultText(p):
             p['battery'], p['layout']['count'], p['layout']['desc']))
     else:
         lines.append('<b>{}: no batteries fit</b>'.format(p['battery']))
+    if p.get('tabTri') is not None:
+        cost = ('no slots' if p['tabBlocked'] == 0
+                else '1 slot' if p['tabBlocked'] == 1
+                else '{} slots'.format(p['tabBlocked']))
+        lines.append('Label "{}" on a {:.1f} mm {} corner shelf, costs {} '
+                     '({:.2f} mm strokes)'.format(
+                         p['tabText'], p['tabLeg'], p['tabCorner'].lower(), cost,
+                         p['tabStem']))
     if p.get('mixedGain', 0) > 0:
         lines.append('{} more would fit with mixed slot orientations allowed'.format(
             p['mixedGain']))
@@ -434,6 +551,15 @@ def updateComputed(inputs: adsk.core.CommandInputs):
         # and mixed orientations only mean anything for rectangular slots
         mixed = adsk.core.BoolValueCommandInput.cast(inputs.itemById(MIXED_LAYOUT_ID))
         mixed.isVisible = not p['isRound']
+        # the label controls only matter once there is a tab, and the free-text
+        # field only once the chemistry is one the table does not cover
+        for inputId in (CHEMISTRY_ID, CHEMISTRY_OTHER_ID, TAB_CORNER_ID,
+                        TAB_TEXT_HEIGHT_ID, TAB_FONT_ID):
+            inputs.itemById(inputId).isVisible = p['tabEnabled']
+        other = inputs.itemById(CHEMISTRY_OTHER_ID)
+        other.isEnabled = p['chemistry'] == batteryDefs.CHEMISTRY_OTHER
+        if not other.isEnabled and other.value != p['tabText']:
+            other.value = p['tabText']
         heightSpinner.isEnabled = not p['autoHeight']
         heightMm.isEnabled = not p['autoHeight']
         if p['autoHeight']:
@@ -515,6 +641,24 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     rulesGroup.children.addBoolValueInput(
         MIXED_LAYOUT_ID, 'Allow mixed slot orientations (9V)', True, '',
         batteryDefs.DEFAULT_ALLOW_MIXED_LAYOUT)
+
+    # label tab
+    labelGroup = inputs.addGroupCommandInput(LABEL_GROUP_ID, 'Label tab')
+    labelGroup.children.addBoolValueInput(
+        TAB_ENABLED_ID, 'Chemistry label tab', True, '', batteryDefs.DEFAULT_TAB_ENABLED)
+    chemistry = labelGroup.children.addDropDownCommandInput(
+        CHEMISTRY_ID, 'Chemistry', adsk.core.DropDownStyles.TextListDropDownStyle)
+    for name in batteryDefs.CHEMISTRY_NAMES:
+        chemistry.listItems.add(name, name == 'Alkaline', '')
+    labelGroup.children.addStringValueInput(CHEMISTRY_OTHER_ID, 'Label text', '')
+    corner = labelGroup.children.addDropDownCommandInput(
+        TAB_CORNER_ID, 'Tab corner', adsk.core.DropDownStyles.TextListDropDownStyle)
+    for name in layout.TAB_CORNERS:
+        corner.listItems.add(name, name == batteryDefs.DEFAULT_TAB_CORNER, '')
+    addMmInput(labelGroup.children, TAB_TEXT_HEIGHT_ID, 'Label text height',
+               batteryDefs.DEFAULT_TAB_TEXT_HEIGHT)
+    labelGroup.children.addStringValueInput(TAB_FONT_ID, 'Label font',
+                                            batteryDefs.DEFAULT_TAB_FONT)
 
     # bin features
     featuresGroup = inputs.addGroupCommandInput(FEATURES_GROUP_ID, 'Bin features')
@@ -644,6 +788,43 @@ def sketchCurveBounds(sketch: adsk.fusion.Sketch):
     return unionBounds([curve3dBounds(curve.geometry) for curve in sketch.sketchCurves])
 
 
+def loopKey(loop: adsk.fusion.ProfileLoop):
+    """An identity for a profile loop: the bounds of each of its curves.
+
+    Two loops built from the same sketch curves - a hole in one region and the
+    outline of the region filling it - come out equal, which is what lets the
+    nesting be read off the loops instead of guessed from bounding boxes.
+    """
+    boxes = []
+    for profileCurve in loop.profileCurves:
+        box = curve3dBounds(profileCurve.geometry)
+        if box is None:
+            return None
+        boxes.append(tuple(round(value, 6) for value in box))
+    if not boxes:
+        return None
+    return tuple(sorted(boxes))
+
+
+def profileLoopKeys(profile: adsk.fusion.Profile):
+    """(outer key, inner keys) for a profile, or None if it cannot be read."""
+    outer = None
+    inners = []
+    for loop in profile.profileLoops:
+        key = loopKey(loop)
+        if key is None:
+            return None
+        if loop.isOuter:
+            if outer is not None:
+                return None     # two outer loops is not a shape to guess at
+            outer = key
+        else:
+            inners.append(key)
+    if outer is None:
+        return None
+    return (outer, tuple(inners))
+
+
 def profileOuterBounds(profile: adsk.fusion.Profile):
     boxes = []
     for loop in profile.profileLoops:
@@ -753,11 +934,18 @@ def engraveLogo(component: adsk.fusion.Component, binBody, p, CM):
         if not profiles:
             raise LogoError('The SVG has no closed shapes to engrave - every path that '
                             'should be cut has to form a closed loop.')
-        boxes = [profileOuterBounds(profile) for profile in profiles]
-        if any(box is None for box in boxes):
-            regions = profiles
+        # Which regions are ink and which are counters, taken from the loops
+        # Fusion itself worked out. Bounding boxes are the fallback and are
+        # only right when no shape reaches across another.
+        keys = [profileLoopKeys(profile) for profile in profiles]
+        if all(key is not None for key in keys):
+            regions = [profiles[i] for i in logoUtils.keepByLoopNesting(keys)]
         else:
-            regions = [profiles[i] for i in logoUtils.keepByNestingParity(boxes)]
+            boxes = [profileOuterBounds(profile) for profile in profiles]
+            if any(box is None for box in boxes):
+                regions = profiles
+            else:
+                regions = [profiles[i] for i in logoUtils.keepByNestingParity(boxes)]
         if not regions:
             raise LogoError('Every region in the SVG looked like a hole; check the artwork.')
 
@@ -773,6 +961,194 @@ def engraveLogo(component: adsk.fusion.Component, binBody, p, CM):
         cutInput.setSymmetricExtent(
             adsk.core.ValueInput.createByReal(p['logoDepth'] * CM * 2.0), True)
         extrudeFeatures.add(cutInput).name = name + ' engrave'
+
+
+class LabelError(Exception):
+    pass
+
+
+def labelBuryDepth(p):
+    """How far the label shelf's legs reach into the walls, in mm.
+
+    The shelf has to overlap the wall or the boolean join leaves a seam, but
+    it must not reach past the bin's OUTER surface - and at a corner that
+    surface is a fillet, curving away from the square corner the shelf wants
+    to occupy. Burying by a whole wall thickness put the shelf's corner
+    1.55 mm outside the bin, which showed up as a tab hanging off the edge.
+
+    `layout.cornerBuryLimit` gives the hard limit; take a fraction of it so a
+    different wall thickness or clearance cannot creep back over the line, and
+    never go negative - a thin enough wall leaves no room at all, which the
+    dialog warns about rather than silently building a bin with a tab on it.
+    """
+    limit = layout.cornerBuryLimit(labelOuterFillet(p), p['wallThickness'])
+    return max(0.0, min(p['wallThickness'] / 2.0, 0.6 * limit))
+
+
+def hide(entity):
+    """Turn an entity's visibility off, tolerating one that has none.
+
+    Leftover sketches and construction planes are not just clutter: they
+    highlight along with the body when anything on the bin is selected, which
+    makes it look as though the shelf cannot be deselected.
+    """
+    try:
+        entity.isVisible = False
+    except (AttributeError, RuntimeError):
+        pass
+
+
+def labelOuterFillet(p):
+    """Radius of the bin's outer corner fillet, mm - the same figure the body
+    generator is given."""
+    return const.BIN_CORNER_FILLET_RADIUS * 10.0 - p['xyClearance']
+
+
+def buildLabelTab(component: adsk.fusion.Component, binBody, p, CM, wall,
+                  ledgeZCm, wallTopCm):
+    """Corner block on the ledge carrying the chemistry code.
+
+    A solid block rather than a gridfinity overhang tab: it needs no support,
+    it cannot droop, and the slots it would have covered were removed from the
+    layout already. Its top face sits below the wall top by the tab clearance,
+    so a bin stacked above lands on the lip and never touches it.
+
+    The lettering stands proud of that face and is joined into the bin, so a
+    generated bin is a single solid - see JOIN_TEXT_TO_BIN.
+    """
+    topZ = wallTopCm - p['tabTopClearance'] * CM
+    thickness = p['tabThickness'] * CM
+    if topZ - thickness <= ledgeZCm + 1e-6:
+        raise LabelError('The ledge drop leaves no room for a label shelf.')
+
+    def triangleSketch(planeZ, leg, name):
+        """A corner triangle, its legs buried into the walls so the shelf is
+        anchored in them rather than floating a hair away."""
+        planeInput = component.constructionPlanes.createInput()
+        planeInput.setByOffset(component.xYConstructionPlane,
+                               adsk.core.ValueInput.createByReal(planeZ))
+        plane = component.constructionPlanes.add(planeInput)
+        plane.name = name + ' plane'
+        sketch = component.sketches.add(plane)
+        sketch.name = name
+        bury = labelBuryDepth(p)
+        points = layout.tabTriangle(p['floorW'], p['floorL'], leg, p['tabCorner'])
+        (cx, cy), (ax, ay), (bx, by) = points
+        # push the right-angle corner outwards and grow the legs to match,
+        # which leaves the hypotenuse exactly where it was
+        signX = 1.0 if ax > cx else -1.0
+        signY = 1.0 if by > cy else -1.0
+        corner = (cx - signX * bury, cy - signY * bury)
+        legOut = leg + 2.0 * bury
+        tri = [corner,
+               (corner[0] + signX * legOut, corner[1]),
+               (corner[0], corner[1] + signY * legOut)]
+        lines = sketch.sketchCurves.sketchLines
+        for index in range(3):
+            (px, py) = tri[index]
+            (qx, qy) = tri[(index + 1) % 3]
+            lines.addByTwoPoints(
+                adsk.core.Point3D.create(wall + px * CM, wall + py * CM, 0),
+                adsk.core.Point3D.create(wall + qx * CM, wall + qy * CM, 0))
+        profiles = list(sketch.profiles)
+        if not profiles:
+            raise LabelError('The label shelf outline did not close.')
+        # A loft leaves its profile sketches on show, unlike an extrude, and a
+        # visible sketch highlights along with the body whenever anything on
+        # the bin is picked. Hide them and the plane they sit on.
+        hide(sketch)
+        hide(plane)
+        return profiles[0]
+
+    # A wedge, not a column: full thickness where it meets the walls, tapering
+    # to the hypotenuse. Pulling the lower triangle back by exactly the shelf
+    # thickness puts the underside at 45 degrees, so it prints without support
+    # - the same reason a gridfinity label tab is shaped the way it is.
+    topProfile = triangleSketch(topZ, p['tabLeg'], 'Label shelf top')
+    lowerLeg = p['tabLeg'] - p['tabThickness'] * math.sqrt(2.0)
+    if lowerLeg <= 0:
+        raise LabelError('The label shelf is too small for its own thickness.')
+    bottomProfile = triangleSketch(topZ - thickness, lowerLeg, 'Label shelf underside')
+
+    loftInput = component.features.loftFeatures.createInput(
+        adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    loftInput.loftSections.add(bottomProfile)
+    loftInput.loftSections.add(topProfile)
+    shelfBodies = list(component.features.loftFeatures.add(loftInput).bodies)
+    if not shelfBodies:
+        raise LabelError('Fusion produced no label shelf.')
+    combineUtils.joinBodies(binBody, commonUtils.objectCollectionFromList(shelfBodies),
+                            component)
+
+    # ---- the lettering, on the shelf's top face
+    planeInput = component.constructionPlanes.createInput()
+    planeInput.setByOffset(component.xYConstructionPlane,
+                           adsk.core.ValueInput.createByReal(topZ))
+    textPlane = component.constructionPlanes.add(planeInput)
+    textPlane.name = 'Label text plane'
+
+    textSketch = component.sketches.add(textPlane)
+    textSketch.name = 'Label text'
+    (bx0, by0), (bx1, by1) = layout.tabTextBaseline(
+        p['floorW'], p['floorL'], p['tabLeg'], p['tabMargin'], p['tabCorner'])
+    baseline = textSketch.sketchCurves.sketchLines.addByTwoPoints(
+        adsk.core.Point3D.create(wall + bx0 * CM, wall + by0 * CM, 0),
+        adsk.core.Point3D.create(wall + bx1 * CM, wall + by1 * CM, 0))
+    # construction, or it would close a profile of its own against the shelf
+    baseline.isConstruction = True
+
+    texts = textSketch.sketchTexts
+    textInput = texts.createInput2(p['tabText'], p['tabTextHeight'] * CM)
+    # along the hypotenuse rather than square to the walls: a corner label
+    # reads on the diagonal, and the baseline is aimed so the lettering falls
+    # towards the right-angle corner where the triangle has room for it
+    textInput.setAsAlongPath(
+        baseline, True,
+        adsk.core.HorizontalAlignments.CenterHorizontalAlignment, 0)
+    textInput.fontName = p['tabFont']
+    if p['tabBold']:
+        # not decoration: a regular weight at this size has stems too narrow
+        # for the slicer to lay a line into, and it drops the letters entirely.
+        # TextStyles has moved between adsk.core and adsk.fusion across API
+        # versions, so ask both rather than trusting one.
+        styles = (getattr(adsk.fusion, 'TextStyles', None)
+                  or getattr(adsk.core, 'TextStyles', None))
+        bold = getattr(styles, 'TextStyleBold', None) if styles else None
+        if bold is not None:
+            textInput.textStyle = bold
+    sketchText = texts.add(textInput)
+
+    # Raised, standing on the shelf rather than sunk into it. The shelf top is
+    # already below the wall top by more than the letters are tall, so nothing
+    # reaches a bin stacked above. New bodies rather than a join extrude, so
+    # that a missing font shows up as no bodies and a real error message
+    # instead of a silently blank shelf; they are joined in below.
+    extrudes: adsk.fusion.ExtrudeFeatures = component.features.extrudeFeatures
+    textExtrude = extrudes.createInput(
+        sketchText, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    textExtrude.setOneSideExtent(
+        adsk.fusion.DistanceExtentDefinition.create(
+            adsk.core.ValueInput.createByReal(p['tabTextDepth'] * CM)),
+        adsk.fusion.ExtentDirections.PositiveExtentDirection,
+        adsk.core.ValueInput.createByReal(0))
+    textBodies = list(extrudes.add(textExtrude).bodies)
+    if not textBodies:
+        raise LabelError('Fusion produced no lettering for "{}" in {}; check that the '
+                         'font is installed.'.format(p['tabText'], p['tabFont']))
+    for index, body in enumerate(textBodies):
+        body.name = ('Label text' if len(textBodies) == 1
+                     else 'Label text {}'.format(index + 1))
+
+    # the text sketch carries the construction baseline, which survives the
+    # extrude and would keep highlighting with the bin
+    hide(textSketch)
+    hide(textPlane)
+
+    if JOIN_TEXT_TO_BIN:
+        combineUtils.joinBodies(
+            binBody, commonUtils.objectCollectionFromList(textBodies), component)
+        return []
+    return textBodies
 
 
 # ------------------------------------------------------------------ generation
@@ -941,6 +1317,10 @@ def generateBatteryBin(args: adsk.core.CommandEventArgs):
             adsk.fusion.ExtentDirections.NegativeExtentDirection,
             adsk.core.ValueInput.createByReal(0))
         slotExtrude.add(tipCutInput).name = 'Battery tip recess cuts'
+
+        # ---- optional chemistry label tab in a corner of the ledge
+        if p.get('tabTri') is not None:
+            buildLabelTab(component, binBody, p, CM, wall, ledgeZCm, wallTopCm)
 
         # ---- logo engraved into the printed bottom face (always)
         engraveLogo(component, binBody, p, CM)

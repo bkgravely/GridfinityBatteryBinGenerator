@@ -96,16 +96,100 @@ a layer boundary instead of part way through one. Set it to 0 for the exact
 computed height. Type your own height and the readout will tell you if it ends
 mid-layer, but it won't override you.
 
+### Label tab
+
+Off by default. Turn on **Chemistry label tab** and a small triangular shelf
+appears across one corner of the ledge, carrying a two- or three-letter code —
+ALK, LI, NMH, ION, RCH, ZNC, or your own up to three characters via *Other*.
+
+The battery size is deliberately not on it. You are looking down into the bin to
+read the shelf, so you can already see what is in it, and a shorter label means
+a smaller shelf — LI takes less room than ALK.
+
+**A corner shelf costs at most one slot — measured across every combination.**
+Sweeping the leg length against every battery, every bin size from 1×2 to 5×5
+and all four corners, **24 mm** is the largest shelf that never costs more than
+a single slot anywhere; past it an AAA 2×5 starts losing two. The shipped
+lettering height of **5.9 mm** is the tallest that keeps every code in the list
+inside that 24 mm; NMH is the one that sets it, and ALK lands at 22.5 mm. On a
+2×3 AA bin that is one battery out of twenty-five for a label you can read
+across a drawer.
+
+The shelf is cut to fit the text, so its size follows the *characters*, not the
+character count. Widths come from a table measured off Arial Bold, where a W is
+three and a half times the width of an I — LI needs a 15.4 mm shelf where NMH
+needs 23.9 mm. Set another font and the dialog says the estimate no longer
+applies.
+
+A smaller shelf can cost *nothing* at all, and that part is a guarantee rather
+than a measurement: every slot keeps the slot-to-wall clearance from both walls,
+so in corner coordinates a slot only ever occupies x ≥ 5 and y ≥ 5, while a
+right triangle on the corner only ever occupies x + y ≤ leg. Below twice the
+clearance — 10 mm — they cannot overlap on any bin. A free shelf that size holds
+a two-letter code at a printable stroke, but not a three-letter one. Set the
+text height to taste; the readout states the cost and the stroke width before
+you commit, and warns if you go past the one-slot size.
+
+It is a true ledge, not a column: a wedge at full thickness where it meets the
+walls, tapering to the hypotenuse so the underside sits at 45° and prints
+without support — the same reason a gridfinity label tab is shaped the way it
+is. Its top sits 1 mm below the wall top, so bins still stack.
+
+The lettering runs **parallel to the hypotenuse**, the way a corner label wants
+to read, is set **bold**, and stands 0.4 mm proud of the shelf. Bold is not
+decoration: raised text prints as walls, and a regular weight at this size has
+stems around 0.34 mm — narrower than the 0.42 mm line a 0.4 mm nozzle lays
+down. The slicer does not thin such a wall, it discards it, so the letters
+vanish and a blank shelf prints. Bold takes the stems to 0.53 mm, and the
+readout states the stroke width so you can see it before printing. The shelf
+top is already 1 mm below the wall top, so the raised text still clears a bin
+stacked above.
+
+The text is **joined into the bin**, so a generated bin is a single solid body
+and arrives in the slicer as one object. Two colours would want the opposite —
+a slicer assigns filament per part, so lettering that came across as its own
+part could be given a second filament by picking it rather than painting it.
+That does not survive the trip today: Fusion writes one 3MF object per body,
+and Bambu Studio loads those as separate objects rather than parts of one,
+dropping each to the plate, so a labelled bin arrives as a bin plus loose
+letters scattered around the bed. Until that export path is worked out, one
+body is worth more than a colour option. Flip `JOIN_TEXT_TO_BIN` at the top of
+the command's `entry.py` to get separate letter bodies back.
+
 ### Logo
 
 ![Redwood Craftworks logo engraved into the corner foot of a bin](docs/images/logo-foot.png)
 
 Every bin is engraved with the logo at
 `GridfinityBatteryBinGenerator/commands/commandCreateBatteryBin/resources/logo.svg`,
-31 mm across and 0.4 mm deep (two 0.2 mm layers) on the corner foot. There is
-no dialog control for it — the size, depth, foot and orientation are constants
-at the top of `lib/batteryUtils/logoUtils.py`, and the artwork is changed by
-replacing that SVG.
+31 mm on its long axis and 0.8 mm deep (four 0.2 mm layers) on the corner foot.
+There is no dialog control for it — the size, depth, foot and orientation are
+constants at the top of `lib/batteryUtils/logoUtils.py`, and the artwork is
+changed by replacing that SVG.
+
+The mark is the R / redwood / C monogram rather than the full wordmark. It
+reads as Redwood Craftworks without spelling it out, the way a mark on a shirt
+sleeve does, and it suits a 31 mm engraving better than lettering does: the
+narrowest thing in it is a branch tip rather than the waist of an S. The
+wordmark is kept at `docs/logo-wordmark.svg` if it is ever wanted back.
+
+### Installer
+
+The MSI has a licence page, a progress bar and a finish page that confirms the
+install worked and tells you to restart Fusion.
+
+Uninstalling removes the add-in's own folder and nothing else. `Autodesk\
+ApplicationPlugins` is shared by every Fusion add-in installed this way, and
+Windows Installer deletes any directory it created once the last thing in it
+goes — so without help, removing this add-in from a machine where it was the
+only one would delete the shared folder too. Two permanent components hold it
+and the `Autodesk` folder above it open.
+
+There are no branded uninstall dialogs, and not for want of trying. Add/Remove
+Programs does not run an MSI uninstall at a UI level that shows a package's
+authored dialogs — it puts up its own confirmation and its own progress, and
+the package has no say in it. The note at the top of `installer/make_wxs.py`
+records the attempt so it does not get made twice.
 
 To swap the artwork, put your SVG at `docs/logo-source.svg` and run:
 
@@ -117,10 +201,18 @@ python3 tools/bake_logo.py docs/logo-source.svg \
 The tool mirrors the artwork, rotates it 90°, and writes the result into the
 path data rather than a transform attribute — Fusion imports SVG geometry as
 fixed curves and clips to the viewBox, so a transform on a `<g>` is how a
-rotated logo silently becomes no logo at all. It also drops zero-length
-segments (Adobe exports are full of them; this one had 26) and snaps every
-contour shut on its start point. Both would otherwise stop Fusion forming a
-profile, and a region with no profile is a region that does not get engraved.
+rotated logo silently becomes no logo at all.
+
+It also repairs the artwork. Drawing programs leave degenerate segments behind
+(this artwork had 43) and close contours by overshooting the start rather than
+meeting it, and both matter downstream: an unclosed contour stops Fusion
+forming a profile, and a region with no profile never gets engraved, while a
+contour that crosses itself extrudes into a non-manifold edge that every slicer
+complains about. So the tool drops segments below 0.05 units, heals the gap
+that leaves, trims an overshooting tail back to where it actually crosses, and
+snaps the contour shut. Then it validates the result and refuses to write a
+file with any contour left open or self-intersecting.
+
 Lettering must be **converted to outlines** — Fusion ignores `<text>` entirely.
 
 **Draw the letters as solid shapes, not outlines, and size them generously.**
@@ -216,8 +308,8 @@ Every release lists the SHA-256 of the MSI. The installer is also
 Authenticode-signed as **Bryan Gravely**; check both:
 
 ```powershell
-Get-FileHash .\GridfinityBatteryBinGenerator-1.1.0-x64.msi -Algorithm SHA256
-Get-AuthenticodeSignature .\GridfinityBatteryBinGenerator-1.1.0-x64.msi | Format-List
+Get-FileHash .\GridfinityBatteryBinGenerator-1.1.1-x64.msi -Algorithm SHA256
+Get-AuthenticodeSignature .\GridfinityBatteryBinGenerator-1.1.1-x64.msi | Format-List
 ```
 
 Hash the `.msi` itself, and compare case-insensitively — `Get-FileHash` prints
@@ -225,6 +317,7 @@ uppercase, `sha256sum` lowercase.
 
 | Version | SHA-256 of the signed MSI |
 |---|---|
+| 1.1.1 | `8B426C74C137D10D4F9C3D3F7588FE79726FB086378C142B785EF2E804340180` |
 | 1.1.0 | `B105E836D8D14EF6572115A6A4302470325CAAA4FF7249F0AB2564AD7D0369B4` |
 
 ## Development
@@ -237,6 +330,7 @@ python3 GridfinityBatteryBinGenerator/tests/test_layout.py      # packing + heig
 python3 GridfinityBatteryBinGenerator/tests/test_logo.py        # logo placement, nesting, SVG rewriting
 python3 GridfinityBatteryBinGenerator/tests/test_entry_sim.py   # dialog logic against a stubbed Fusion API
 python3 GridfinityBatteryBinGenerator/tests/test_packaging.py   # version/publisher consistency across manifest + installer
+python3 GridfinityBatteryBinGenerator/tests/test_names.py       # static check for unbound names in code Fusion alone can run
 ```
 
 `installer/` holds the Windows MSI sources: `make_wxs.py` regenerates the WiX

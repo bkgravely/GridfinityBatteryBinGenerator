@@ -35,5 +35,21 @@ cp "$HERE/bannrbmp.bmp" "$WORK/ext/ui/bitmaps/bannrbmp.bmp"
 cd "$WORK"
 python3 make_wxs.py
 wixl --extdir "$WORK/ext" --ext ui --arch x64 -o "$OUT" GridfinityBatteryBinGenerator.wxs
+
+# Third wixl quirk: it does not implement Component/@Permanent, and says so on
+# stderr rather than failing. Those two components exist to hold
+# Autodesk\ApplicationPlugins open - Windows Installer deletes any directory it
+# created once the last thing in it is removed, so without them uninstalling
+# this add-in takes the shared plugin folder with it whenever ours is the only
+# plugin there. Set the permanent bit (16) on top of the 64-bit bit (256) that
+# wixl did write. The WiX Toolset path honours Permanent="yes" directly and
+# needs none of this.
+for component in cmpKeepAutodesk cmpKeepAppPlugins; do
+  msibuild "$OUT" -q "UPDATE \`Component\` SET \`Attributes\` = 272 WHERE \`Component\` = '$component'"
+done
+for component in cmpKeepAutodesk cmpKeepAppPlugins; do
+  msiinfo export "$OUT" Component | awk -F'\t' -v c="$component" '$1==c && $4!=272 {
+      print "ERROR: " c " is not marked permanent (attributes " $4 ")"; exit 1 }'
+done
 cp GridfinityBatteryBinGenerator.wxs "$HERE/"
 echo "Built $OUT"

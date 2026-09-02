@@ -60,11 +60,14 @@ def mmInput(mm):
 
 def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8,
                constrainUnits=True, heightMm=56.0, layerHeight=None,
-               allowMixed=None):
+               allowMixed=None, tab=False, chemistry='Alkaline', chemOther='',
+               tabCorner='Back left', tabTextHeight=None, tabFont='Arial'):
     if layerHeight is None:
         layerHeight = defsMod.DEFAULT_LAYER_HEIGHT
     if allowMixed is None:
         allowMixed = defsMod.DEFAULT_ALLOW_MIXED_LAYOUT
+    if tabTextHeight is None:
+        tabTextHeight = defsMod.DEFAULT_TAB_TEXT_HEIGHT
     e = entry
     d = defsMod.BATTERY_DEFAULTS[battery]
     items = {
@@ -90,6 +93,12 @@ def makeInputs(battery='AA', binX=2, binY=3, autoHeight=True, units=8,
         e.HEADROOM_ID: mmInput(0.5),
         e.MIN_FLOOR_ID: mmInput(1.0),
         e.MIXED_LAYOUT_ID: SimpleNamespace(value=allowMixed),
+        e.TAB_ENABLED_ID: SimpleNamespace(value=tab),
+        e.CHEMISTRY_ID: SimpleNamespace(selectedItem=SimpleNamespace(name=chemistry)),
+        e.CHEMISTRY_OTHER_ID: SimpleNamespace(value=chemOther, isEnabled=True, isVisible=True),
+        e.TAB_CORNER_ID: SimpleNamespace(selectedItem=SimpleNamespace(name=tabCorner)),
+        e.TAB_TEXT_HEIGHT_ID: mmInput(tabTextHeight),
+        e.TAB_FONT_ID: SimpleNamespace(value=tabFont),
         e.WITH_LIP_ID: SimpleNamespace(value=True),
         e.LIP_NOTCHES_ID: SimpleNamespace(value=False),
         e.WALL_THICKNESS_ID: mmInput(2.15),
@@ -216,6 +225,98 @@ check('9V after switch: slot width 17.5',
 check('9V after switch validates (OK not greyed)', fireValidate(inputs) is True)
 p = entry.readParams(inputs)
 check('9V after switch: 11 slots', p['layout']['count'] == 11, p['layout'])
+
+
+# ---- chemistry label tab
+check('label tab is off by default', defsMod.DEFAULT_TAB_ENABLED is False)
+# One body per bin. Separate letter bodies are what a second filament would
+# need, but Fusion writes a body per 3MF object and Bambu loads those as loose
+# objects dropped to the plate, so the letters arrive scattered beside the bin.
+check('the lettering is joined into the bin', entry.JOIN_TEXT_TO_BIN is True)
+off = entry.readParams(makeInputs(battery='AA', binX=2, binY=3))
+check('no tab means no tab geometry', off['tabTri'] is None, off['tabTri'])
+check('no tab costs nothing', off['tabBlocked'] == 0)
+check('no tab, no readout line', 'Label' not in entry.formatResultText(off))
+
+for chem, code in defsMod.CHEMISTRY_LABELS:
+    if chem == defsMod.CHEMISTRY_OTHER:
+        continue
+    p = entry.readParams(makeInputs(battery='AA', binX=2, binY=3, tab=True, chemistry=chem))
+    check(chem + ' abbreviates to ' + code, p['tabText'] == code, p['tabText'])
+    check(chem + ' tab is valid', p['errors'] == [], p['errors'])
+    check(chem + ' tab fits in three characters', len(p['tabText']) <= defsMod.MAX_TAB_CHARS)
+
+# the cost, which is the whole reason the corner was chosen
+p = entry.readParams(makeInputs(battery='AA', binX=2, binY=3, tab=True))
+check('AA 2x3 shelf costs at most one slot', p['tabBlocked'] <= 1, p['tabBlocked'])
+check('tab count reflects the loss', p['layout']['count'] == off['layout']['count'] - p['tabBlocked'])
+check('a default shelf does not warn', p['warnings'] == [], p['warnings'])
+check('readout names the label', '"ALK"' in entry.formatResultText(p), entry.formatResultText(p))
+check('readout calls it a corner shelf', 'corner shelf' in entry.formatResultText(p))
+check('readout states the stroke width', 'mm strokes' in entry.formatResultText(p),
+      entry.formatResultText(p))
+check('default lettering is printable',
+      p['tabStem'] >= defsMod.MIN_PRINTABLE_STROKE, p['tabStem'])
+check('lettering is bold by default', p['tabBold'] is True)
+
+# text too small to print is the failure that silently produced a blank shelf
+tiny = entry.readParams(makeInputs(battery='AA', tab=True, tabTextHeight=1.5))
+check('unprintably thin lettering warns',
+      any('stems' in w for w in tiny['warnings']), tiny['warnings'])
+check('the warning names a workable height',
+      any('or more' in w for w in tiny['warnings']), tiny['warnings'])
+check('readout states the cost',
+      'costs no slots' in entry.formatResultText(p) or 'costs 1 slot' in entry.formatResultText(p),
+      entry.formatResultText(p))
+
+# a tab must never move the slots that survive
+for bat in defsMod.BATTERY_TYPES:
+    a = entry.readParams(makeInputs(battery=bat, binX=3, binY=3))
+    b = entry.readParams(makeInputs(battery=bat, binX=3, binY=3, tab=True))
+    check(bat + ' shelf costs at most one slot', b['tabBlocked'] <= 1, b['tabBlocked'])
+    check(bat + ' surviving slots do not move',
+          b['layout']['centers'] == [c for c in a['layout']['centers']
+                                     if c in b['layout']['centers']])
+    check(bat + ' shelf stays inside the one-slot size',
+          b['tabLeg'] <= defsMod.ONE_SLOT_TAB_LEG + 1e-9, b['tabLeg'])
+
+# every corner works, sits on the floor corner, and costs nothing
+for corner in layoutMod.TAB_CORNERS:
+    p = entry.readParams(makeInputs(battery='AA', binX=2, binY=3, tab=True, tabCorner=corner))
+    (cx, cy) = p['tabTri'][0]
+    check(corner + ' shelf sits on that corner',
+          (abs(cx) < 1e-9 or abs(cx - p['floorW']) < 1e-9)
+          and (abs(cy) < 1e-9 or abs(cy - p['floorL']) < 1e-9), p['tabTri'])
+    check(corner + ' shelf is inside the floor',
+          all(-1e-9 <= x <= p['floorW'] + 1e-9 and -1e-9 <= y <= p['floorL'] + 1e-9
+              for (x, y) in p['tabTri']), p['tabTri'])
+    check(corner + ' shelf costs at most one slot', p['tabBlocked'] <= 1, p['tabBlocked'])
+
+# Other: free text, capped by what the corner physically holds
+p = entry.readParams(makeInputs(battery='AA', tab=True, chemistry='Other', chemOther=''))
+check('Other with no text is rejected', any('Enter the label' in e for e in p['errors']), p['errors'])
+p = entry.readParams(makeInputs(battery='AA', tab=True, chemistry='Other', chemOther='NiMH'))
+check('four characters are rejected', any('characters' in e for e in p['errors']), p['errors'])
+p = entry.readParams(makeInputs(battery='AA', tab=True, chemistry='Other', chemOther=' li '))
+check('free text is trimmed and upper-cased', p['tabText'] == 'LI', p['tabText'])
+check('trimmed free text is valid', p['errors'] == [], p['errors'])
+
+# a shorter label earns a smaller tab
+wide = entry.readParams(makeInputs(battery='AA', tab=True, chemistry='Alkaline'))
+narrow = entry.readParams(makeInputs(battery='AA', tab=True, chemistry='Lithium'))
+check('two letters make a smaller shelf', narrow['tabLeg'] < wide['tabLeg'],
+      (narrow['tabLeg'], wide['tabLeg']))
+check('the default shelf is inside the one-slot size',
+      wide['tabLeg'] <= defsMod.ONE_SLOT_TAB_LEG + 1e-9, wide['tabLeg'])
+
+# oversized text is allowed, but it has to say what it costs
+big = entry.readParams(makeInputs(battery='AA', binX=2, binY=3, tab=True, tabTextHeight=9.0))
+check('a shelf past the one-slot size is flagged',
+      big['tabLeg'] > defsMod.ONE_SLOT_TAB_LEG, big['tabLeg'])
+check('oversized shelf warns',
+      any('never costs more than one' in w for w in big['warnings']), big['warnings'])
+check('oversized shelf names a workable text height',
+      any('holds it to one slot' in w for w in big['warnings']), big['warnings'])
 
 
 # ---- mixed slot orientations: on by default, and optional
